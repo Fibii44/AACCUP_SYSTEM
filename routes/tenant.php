@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 use App\Http\Controllers\LandingPageController;
 use App\Http\Controllers\Tenant\TenantLoginController;
+use App\Http\Controllers\Tenant\TenantFacultyController;
+use App\Http\Middleware\RoleMiddleware;
 use Illuminate\Support\Facades\Route;
 use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
+
+
+
 
 /*
 |--------------------------------------------------------------------------
@@ -35,13 +40,29 @@ Route::middleware([
     
     // Authenticated tenant routes
     Route::middleware(['auth'])->group(function () {
-        // Admin can customize the landing page
-        Route::get('/admin/landing-settings', [LandingPageController::class, 'index'])->name('tenant.landing-settings');
-        Route::post('/admin/landing-settings', [LandingPageController::class, 'updateSettings'])->name('tenant.landing-settings.update');
-        
-        // Add a dashboard for tenant users
-        Route::get('/dashboard', function () {
-            return view('tenant.dashboard');
-        })->name('tenant.dashboard');
+        // Admin routes
+        Route::middleware([RoleMiddleware::class . ':admin'])->group(function () {
+            // Admin Dashboard
+            Route::get('/dashboard', function () {
+                return view('tenant.dashboard');
+            })->name('tenant.dashboard');
+
+            // Admin management routes
+            Route::get('/admin/landing-settings', [LandingPageController::class, 'index'])
+                ->name('tenant.landing-settings');
+            Route::post('/admin/landing-settings', [LandingPageController::class, 'updateSettings'])
+                ->name('tenant.landing-settings.update');
+            Route::get('/user-table', [TenantFacultyController::class, 'index'])
+                ->name('tenant.user-table');
+            Route::post('/faculty/store', [TenantFacultyController::class, 'store'])
+                ->name('tenant.faculty.store');
+        });
+
+        // Faculty routes
+        Route::middleware([RoleMiddleware::class . ':user'])->group(function () {
+            Route::get('/faculty/dashboard', function () {
+                return view('tenant.facultyDashboard');
+            })->name('tenant.facultyDashboard');
+        });
     });
 });

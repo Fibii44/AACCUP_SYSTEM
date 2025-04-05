@@ -65,5 +65,6 @@ class Kernel extends HttpKernel
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         'initialize-tenant-by-domain' => \App\Http\Middleware\InitializeTenancyByDomain::class,
+        'role' => \App\Http\Middleware\RoleMiddleware::class,
     ];
 } 
