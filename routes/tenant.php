@@ -56,6 +56,10 @@ Route::middleware([
                 ->name('tenant.user-table');
             Route::post('/faculty/store', [TenantFacultyController::class, 'store'])
                 ->name('tenant.faculty.store');
+            Route::patch('/faculty/{id}', [TenantFacultyController::class, 'update'])
+                ->name('tenant.faculty.update');
+            Route::delete('/faculty/{id}', [TenantFacultyController::class, 'destroy'])
+                ->name('tenant.faculty.destroy');
         });
 
         // Faculty routes

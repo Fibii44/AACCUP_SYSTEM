@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use App\Http\Requests\StoreFacultyRequest;
+use App\Http\Requests\UpdateFacultyRequest;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -25,7 +27,7 @@ class TenantFacultyController extends Controller
     /**
      * Store a newly created faculty member.
      */
-    public function store(Request $request)
+    public function store(StoreFacultyRequest $request)
     {
         try {
             Log::info('Starting faculty creation process', [
@@ -33,19 +35,16 @@ class TenantFacultyController extends Controller
                 'email' => $request->email
             ]);
 
-            // Validate the request
-            $request->validate([
-                'name' => 'required|string|max:255',
-                'email' => 'required|email|unique:users,email|max:255',
-            ]);
+            // The request is already validated by StoreFacultyRequest
+            $validated = $request->validated();
 
             // Generate a random password
-            $password = Str::random(8);
+            $password = Str::random(12);
 
             // Create new faculty user with role 'user'
             $user = User::create([
-                'name' => $request->name,
-                'email' => $request->email,
+                'name' => $validated['name'],
+                'email' => $validated['email'],
                 'password' => Hash::make($password),
                 'role' => 'user',
             ]);
@@ -62,4 +61,82 @@ class TenantFacultyController extends Controller
                 ->withInput();
         }
     }
+
+    public function update(UpdateFacultyRequest $request, $id)
+    {
+        try {
+            $user = User::findOrFail($id);
+            
+            // Only allow editing faculty users
+            if ($user->role !== 'user') {
+                return redirect()->back()->with('error', 'You can only edit faculty users.');
+            }
+
+            // The request is already validated by UpdateFacultyRequest
+            $validated = $request->validated();
+
+            $user->update([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+            ]);
+
+            Log::info('User updated successfully', [
+                'user_id' => $id,
+                'updated_by' => auth()->id()
+            ]);
+
+            return redirect()->back()->with('success', 'User updated successfully!');
+            
+        } catch (\Exception $e) {
+            Log::error('Error updating user: ' . $e->getMessage(), [
+                'user_id' => $id,
+                'updated_by' => auth()->id()
+            ]);
+            
+            return redirect()->back()
+                ->with('error', 'Error updating user. Please try again.')
+                ->withInput();
+        }
+    }
+    
+
+    public function destroy($id)
+    {
+        try {
+            $user = User::findOrFail($id);
+            
+            // Only allow deleting faculty users
+            if ($user->role !== 'user') {
+                return redirect()->back()->with('error', 'You can only delete faculty users.');
+            }
+
+            // Store user info for logging
+            $userInfo = [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email
+            ];
+
+            // Delete the user
+            $user->delete();
+
+            Log::info('Faculty member deleted successfully', [
+                'deleted_user' => $userInfo,
+                'deleted_by' => auth()->id()
+            ]);
+
+            return redirect()->back()->with('success', 'Faculty member has been deleted successfully.');
+            
+        } catch (\Exception $e) {
+            Log::error('Error deleting faculty member: ' . $e->getMessage(), [
+                'user_id' => $id,
+                'deleted_by' => auth()->id()
+            ]);
+            
+            return redirect()->back()
+                ->with('error', 'Error deleting faculty member. Please try again.');
+        }
+    }
+
+
 }
