@@ -62,7 +62,7 @@
             @endif
             <div class="mt-4">
                 <a href="{{ route('login') }}" class="btn btn-light me-2">Login</a>
-                <a href="{{ route('register') }}" class="btn btn-outline-light">Register</a>
+               
             </div>
         </div>
     </section>

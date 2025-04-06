@@ -66,7 +66,15 @@ class TenantLoginController extends Controller
                 'domain' => $request->getHost()
             ]);
             
-            // Redirect to the intended page or dashboard
+            // Get the authenticated user
+            $user = Auth::user();
+            
+            // Redirect based on user role
+            if ($user->role === 'user') {
+                return redirect()->intended(route('tenant.facultyDashboard'));
+            }
+            
+            // Default redirect for other roles
             return redirect()->intended(route('tenant.dashboard'));
         }
         
