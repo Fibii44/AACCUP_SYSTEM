@@ -26,7 +26,7 @@ class RoleMiddleware
         }
         
         if ($userRole === 'user') {
-            return redirect()->route('tenant.faculty.dashboard')
+            return redirect()->route('tenant.facultyDashboard')
                 ->with('error', 'Access denied. This area is for administrators only.');
         }
 
