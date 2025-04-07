@@ -1,82 +1,63 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="min-h-screen flex flex-col items-center pt-16 sm:pt-32">
-    <div class="w-full max-w-md">
-        <!-- Brand Logo/Name -->
-        <div class="text-center mb-10">
-            @if(isset($settings->logo_url) && $settings->logo_url)
-                <img src="{{ $settings->logo_url }}" alt="Logo" class="h-16 mx-auto mb-4">
-            @else
-                <h1 class="text-3xl font-bold" style="color: {{ $settings->primary_color }}">
-                    {{ explode('.', request()->getHost())[0] }}
-                </h1>
-            @endif
-            <p class="text-gray-600 mt-2">Please sign in to your account</p>
-        </div>
-
-        <!-- Login Card -->
-        <div class="bg-white rounded-lg shadow-md overflow-hidden">
-            <!-- Card Header -->
-            <div class="px-6 py-4" style="background-color: {{ $settings->primary_color }}">
-                <h2 class="text-xl font-semibold text-white">Login</h2>
-            </div>
-
-            <!-- Card Body -->
-            <form method="POST" action="{{ route('tenant.login') }}" class="px-6 py-4">
-                @csrf
-
-                <!-- Email -->
-                <div class="mb-4">
-                    <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                    <input id="email" type="email" name="email" value="{{ old('email') }}" required 
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 @error('email') border-red-500 @enderror">
-                    
-                    @error('email')
-                        <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <!-- Password -->
-                <div class="mb-4">
-                    <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                    <input id="password" type="password" name="password" required 
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 @error('password') border-red-500 @enderror">
-                    
-                    @error('password')
-                        <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <!-- Remember Me -->
-                <div class="mb-4">
-                    <div class="flex items-center">
-                        <input type="checkbox" name="remember" id="remember" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                        <label for="remember" class="ml-2 block text-sm text-gray-700">Remember me</label>
+<div class="main-content mt-0">
+    <section>
+        <div class="page-header min-vh-75">
+            <div class="container">
+                <div class="row">
+                    <div class="col-xl-4 col-lg-5 col-md-6 d-flex flex-column mx-auto">
+                        <div class="card card-plain mt-8">
+                            <div class="card-header pb-0 text-left bg-transparent">
+                                <h3 class="font-weight-bolder text-info text-gradient">Welcome back</h3>
+                                <p class="mb-0">Enter your email and password to sign in</p>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST" action="{{ route('tenant.login') }}" role="form">
+                                    @csrf
+                                    <label>Email</label>
+                                    <div class="mb-3">
+                                        <input type="email" name="email" class="form-control @error('email') is-invalid @enderror" placeholder="Email" aria-label="Email" aria-describedby="email-addon" value="{{ old('email') }}" required>
+                                        @error('email')
+                                            <span class="invalid-feedback" role="alert">
+                                                <strong>{{ $message }}</strong>
+                                            </span>
+                                        @enderror
+                                    </div>
+                                    <label>Password</label>
+                                    <div class="mb-3">
+                                        <input type="password" name="password" class="form-control @error('password') is-invalid @enderror" placeholder="Password" aria-label="Password" aria-describedby="password-addon" required>
+                                        @error('password')
+                                            <span class="invalid-feedback" role="alert">
+                                                <strong>{{ $message }}</strong>
+                                            </span>
+                                        @enderror
+                                    </div>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" name="remember" id="remember" {{ old('remember') ? 'checked' : '' }}>
+                                        <label class="form-check-label" for="remember">Remember me</label>
+                                    </div>
+                                    <div class="text-center">
+                                        <button type="submit" class="btn bg-gradient-info w-100 mt-4 mb-0">Sign in</button>
+                                    </div>
+                                </form>
+                            </div>
+                            <div class="card-footer text-center pt-0 px-lg-2 px-1">
+                                <p class="mb-4 text-sm mx-auto">
+                                    Don't have an account?
+                                    <a href="javascript:;" class="text-info text-gradient font-weight-bold">Contact your administrator</a>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="oblique position-absolute top-0 h-100 d-md-block d-none me-n8">
+                            <div class="oblique-image bg-cover position-absolute fixed-top ms-auto h-100 z-index-0 ms-n6" style="background-image:url('../assets/img/curved-images/homebg2.jpg')"></div>
+                        </div>
                     </div>
                 </div>
-
-                <!-- Login Button -->
-                <div class="flex items-center justify-between mt-6">
-                    <button type="submit" class="text-white px-4 py-2 rounded-md" style="background-color: {{ $settings->primary_color }}">
-                        Login
-                    </button>
-
-                    @if(Route::has('password.request'))
-                        <a href="{{ route('password.request') }}" class="text-sm text-gray-600 hover:text-gray-900">
-                            Forgot your password?
-                        </a>
-                    @endif
-                </div>
-            </form>
+            </div>
         </div>
-
-        <!-- Additional Links -->
-        <div class="text-center mt-6">
-            <p class="text-sm text-gray-600">
-                Don't have an account? Contact your administrator.
-            </p>
-        </div>
-    </div>
+    </section>
 </div>
-@endsection 
+@endsection
