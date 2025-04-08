@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\LandingPageController;
 use App\Http\Controllers\Tenant\TenantLoginController;
 use App\Http\Controllers\Tenant\TenantFacultyController;
+use App\Http\Controllers\Tenant\TenantSettingsController;
 use App\Http\Middleware\RoleMiddleware;
 use Illuminate\Support\Facades\Route;
 use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
@@ -50,8 +51,10 @@ Route::middleware([
             // Admin management routes
             Route::get('/admin/landing-settings', [LandingPageController::class, 'index'])
                 ->name('tenant.landing-settings');
+
             Route::post('/admin/landing-settings', [LandingPageController::class, 'updateSettings'])
                 ->name('tenant.landing-settings.update');
+
             Route::get('/user-table', [TenantFacultyController::class, 'index'])
                 ->name('tenant.user-table');
             Route::post('/faculty/store', [TenantFacultyController::class, 'store'])
@@ -60,6 +63,12 @@ Route::middleware([
                 ->name('tenant.faculty.update');
             Route::delete('/faculty/{id}', [TenantFacultyController::class, 'destroy'])
                 ->name('tenant.faculty.destroy');
+
+            Route::get('/settings', [TenantSettingsController::class, 'index'])
+                ->name('tenant.settings');
+
+            Route::patch('/settings', [TenantSettingsController::class, 'update'])
+                ->name('tenant.settings.update');
         });
 
         // Faculty routes
