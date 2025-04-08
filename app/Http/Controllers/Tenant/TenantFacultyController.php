@@ -18,10 +18,20 @@ class TenantFacultyController extends Controller
     /**
      * Display a listing of the faculty members.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $faculty = User::where('role', 'user')->get();
-        return view('tenant.userTable', compact('faculty'));
+        $statusFilter = $request->input('status', 'all');
+        
+        $query = User::where('role', 'user');
+        
+        // Apply status filter if not 'all'
+        if ($statusFilter !== 'all') {
+            $query->where('status', $statusFilter);
+        }
+        
+        $faculty = $query->get();
+        
+        return view('tenant.userTable', compact('faculty', 'statusFilter'));
     }
 
     /**
@@ -100,43 +110,45 @@ class TenantFacultyController extends Controller
     }
     
 
-    public function destroy($id)
+    
+    /**
+     * Update the status of a faculty member (active/inactive)
+     */
+    public function updateStatus($id)
     {
         try {
             $user = User::findOrFail($id);
             
-            // Only allow deleting faculty users
+            // Only allow updating faculty users
             if ($user->role !== 'user') {
-                return redirect()->back()->with('error', 'You can only delete faculty users.');
+                return redirect()->back()->with('error', 'You can only update faculty users.');
             }
 
-            // Store user info for logging
-            $userInfo = [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email
-            ];
-
-            // Delete the user
-            $user->delete();
-
-            Log::info('Faculty member deleted successfully', [
-                'deleted_user' => $userInfo,
-                'deleted_by' => auth()->id()
+            // Toggle the status
+            $newStatus = $user->status === 'active' ? 'inactive' : 'active';
+            
+            // Update the user status
+            $user->update([
+                'status' => $newStatus
             ]);
 
-            return redirect()->back()->with('success', 'Faculty member has been deleted successfully.');
+            Log::info('Faculty member status updated successfully', [
+                'user_id' => $id,
+                'new_status' => $newStatus,
+                'updated_by' => auth()->id()
+            ]);
+
+            return redirect()->back()->with('success', 'Faculty member status has been updated successfully.');
             
         } catch (\Exception $e) {
-            Log::error('Error deleting faculty member: ' . $e->getMessage(), [
+            Log::error('Error updating faculty member status: ' . $e->getMessage(), [
                 'user_id' => $id,
-                'deleted_by' => auth()->id()
+                'updated_by' => auth()->id()
             ]);
             
             return redirect()->back()
-                ->with('error', 'Error deleting faculty member. Please try again.');
+                ->with('error', 'Error updating faculty member status. Please try again.');
         }
     }
-
 
 }

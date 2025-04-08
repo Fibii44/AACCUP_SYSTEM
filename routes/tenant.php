@@ -61,12 +61,11 @@ Route::middleware([
                 ->name('tenant.faculty.store');
             Route::patch('/faculty/{id}', [TenantFacultyController::class, 'update'])
                 ->name('tenant.faculty.update');
-            Route::delete('/faculty/{id}', [TenantFacultyController::class, 'destroy'])
-                ->name('tenant.faculty.destroy');
+            Route::patch('/faculty/{id}/status', [TenantFacultyController::class, 'updateStatus'])
+                ->name('tenant.faculty.status');
 
             Route::get('/settings', [TenantSettingsController::class, 'index'])
                 ->name('tenant.settings');
-
             Route::patch('/settings', [TenantSettingsController::class, 'update'])
                 ->name('tenant.settings.update');
         });

@@ -3,6 +3,18 @@
 @section('content')
 <div class="row">
     <div class="col-12">
+        <!-- Status Filter -->
+        <div class="mb-3 d-flex justify-content-end">
+            <form action="{{ route('tenant.user-table') }}" method="GET" class="d-flex align-items-center">
+                <label for="statusFilter" class="me-2 mb-0">Filter by status:</label>
+                <select name="status" id="statusFilter" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+                    <option value="all" {{ $statusFilter === 'all' ? 'selected' : '' }}>All Users</option>
+                    <option value="active" {{ $statusFilter === 'active' ? 'selected' : '' }}>Active Users</option>
+                    <option value="inactive" {{ $statusFilter === 'inactive' ? 'selected' : '' }}>Archived Users</option>
+                </select>
+            </form>
+        </div>
+        
         <div class="card mb-4">
             <div class="card-header pb-0 d-flex justify-content-between align-items-center">
                 <h6>Users</h6>
@@ -11,71 +23,83 @@
                     <i class="bi bi-person-plus me-2"></i>
                     <span class="btn-inner--text">Add Faculty</span>
                 </button>
-                        </div>
-            <div class="card-body px-0 pt-0 pb-2">
-            <div class="table-responsive p-0">
-                <table class="table align-items-center mb-0">
-                    <thead>
-                        <tr>
-                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Name</th>
-                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Role</th>
-                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Status</th>
-                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Date Added</th>        
-                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($faculty as $member)
-                        <tr>
-                            <td>
-                                <div class="d-flex px-2 py-1">
-                                    <div class="d-flex flex-column justify-content-center">
-                                        <h6 class="mb-0 text-sm">{{ $member->name }}</h6>
-                                        <p class="text-xs text-secondary mb-0">{{ $member->email }}</p>
-                                    </div>
-                                </div>
-                            </td>
-                            <td>
-                                <span class="badge badge-sm bg-gradient-success">User</span>
-                            </td>
-                            <td>
-                                <span class="badge badge-sm {{ $member->status === 'active' ? 'bg-gradient-success' : 'bg-gradient-secondary' }}">
-                                    {{ ucfirst($member->status) }}
-                                </span>
-                            </td>
-                            
-                            <td>
-                                <span class="text-sm font-weight-normal">
-                                    {{ $member->created_at->format('M d, Y') }}
-                                </span>
-                            </td>
-                            <td>
-                                <div class="d-flex gap-2">
-                                    <!-- Edit Button -->
-                                    <button type="button" class="btn btn-sm bg-gradient-info" 
-                                            data-bs-toggle="modal" 
-                                            data-bs-target="#editFacultyModal" 
-                                            data-faculty-id="{{ $member->id }}"
-                                            data-faculty-name="{{ $member->name }}"
-                                            data-faculty-email="{{ $member->email }}">
-                                        <i class="fas fa-edit"></i> Edit
-                                    </button>
-
-                                    <!-- Delete Button -->
-                                    <button type="button" class="btn btn-sm bg-gradient-danger" 
-                                            data-bs-toggle="modal" 
-                                            data-bs-target="#deleteFacultyModal"
-                                            data-faculty-id="{{ $member->id }}"
-                                            data-faculty-name="{{ $member->name }}">
-                                        <i class="fas fa-trash"></i> Delete
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
             </div>
+            <div class="card-body px-0 pt-0 pb-2">
+                <div class="table-responsive p-0">
+                    <table class="table align-items-center mb-0">
+                        <thead>
+                            <tr>
+                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Name</th>
+                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Role</th>
+                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Status</th>
+                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Date Added</th>        
+                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if($faculty->count() > 0)
+                                @foreach($faculty as $member)
+                                <tr>
+                                    <td>
+                                        <div class="d-flex px-2 py-1">
+                                            <div class="d-flex flex-column justify-content-center">
+                                                <h6 class="mb-0 text-sm">{{ $member->name }}</h6>
+                                                <p class="text-xs text-secondary mb-0">{{ $member->email }}</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-sm bg-gradient-success">User</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-sm {{ $member->status === 'active' ? 'bg-gradient-success' : 'bg-gradient-danger' }}">
+                                            {{ ucfirst($member->status) }}
+                                        </span>
+                                    </td>
+                                    
+                                    <td>
+                                        <span class="text-sm font-weight-normal">
+                                            {{ $member->created_at->format('M d, Y') }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex gap-2">
+                                            <!-- Edit Button -->
+                                            <button type="button" class="btn btn-sm bg-gradient-info" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#editFacultyModal" 
+                                                    data-faculty-id="{{ $member->id }}"
+                                                    data-faculty-name="{{ $member->name }}"
+                                                    data-faculty-email="{{ $member->email }}">
+                                                <i class="fas fa-edit"></i> Edit
+                                            </button>
+
+                                            <!-- Archive Button -->
+                                            <button type="button" class="btn btn-sm {{ $member->status === 'active' ? 'bg-gradient-warning' : 'bg-gradient-success' }}" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#archiveFacultyModal"
+                                                    data-faculty-id="{{ $member->id }}"
+                                                    data-faculty-name="{{ $member->name }}"
+                                                    data-faculty-status="{{ $member->status }}">
+                                                <i class="fas fa-{{ $member->status === 'active' ? 'archive' : 'check-circle' }}"></i> {{ $member->status === 'active' ? 'Archive' : 'Restore' }}
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                @endforeach
+                            @else
+                                <tr>
+                                    <td colspan="5" class="text-center py-4">
+                                        <div class="d-flex flex-column align-items-center">
+                                            <i class="fas fa-users-slash text-secondary mb-2" style="font-size: 2rem;"></i>
+                                            <p class="mb-0">No users found matching the selected filter.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endif
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -145,26 +169,25 @@
     </div>
 </div>
 
-<!-- Delete User Modal -->
-<div class="modal fade" id="deleteFacultyModal" tabindex="-1" role="dialog" aria-labelledby="deleteFacultyModalLabel" aria-hidden="true">
+<!-- Archive User Modal -->
+<div class="modal fade" id="archiveFacultyModal" tabindex="-1" role="dialog" aria-labelledby="archiveFacultyModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="deleteFacultyModalLabel">Confirm Delete</h5>
+                <h5 class="modal-title" id="archiveFacultyModalLabel">Confirm Status Change</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
-            <form id="deleteFacultyForm" method="POST">
+            <form id="archiveFacultyForm" method="POST">
                 @csrf
-                @method('DELETE')
+                @method('PATCH')
                 <div class="modal-body">
-                    <p>Are you sure you want to delete this user: <span id="deleteUserName" class="font-weight-bold"></span>?</p>
-                    <p class="text-danger">This action cannot be undone.</p>
+                    <p>Are you sure you want to <span id="archiveActionText" class="font-weight-bold"></span> this user: <span id="archiveUserName" class="font-weight-bold"></span>?</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn bg-gradient-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn bg-gradient-danger">Delete User</button>
+                    <button type="submit" class="btn bg-gradient-warning" id="archiveSubmitBtn">Archive User</button>
                 </div>
             </form>
         </div>
@@ -235,27 +258,42 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Delete modal functionality
-        const deleteFacultyModal = document.getElementById('deleteFacultyModal');
-        const deleteForm = document.getElementById('deleteFacultyForm');
-        const deleteUserNameSpan = document.getElementById('deleteUserName');
+    // Archive modal functionality
+    const archiveFacultyModal = document.getElementById('archiveFacultyModal');
+    const archiveForm = document.getElementById('archiveFacultyForm');
+    const archiveUserNameSpan = document.getElementById('archiveUserName');
+    const archiveActionTextSpan = document.getElementById('archiveActionText');
+    const archiveSubmitBtn = document.getElementById('archiveSubmitBtn');
 
-        document.querySelectorAll('[data-bs-target="#deleteFacultyModal"]').forEach(button => {
-            button.addEventListener('click', function() {
-                const facultyId = this.getAttribute('data-faculty-id');
-                const facultyName = this.getAttribute('data-faculty-name');
-                
-                // Update the form action URL
-                deleteForm.action = `/faculty/${facultyId}`;
-                
-                // Update the user name in the confirmation message
-                deleteUserNameSpan.textContent = facultyName;
-            });
+    document.querySelectorAll('[data-bs-target="#archiveFacultyModal"]').forEach(button => {
+        button.addEventListener('click', function() {
+            const facultyId = this.getAttribute('data-faculty-id');
+            const facultyName = this.getAttribute('data-faculty-name');
+            const facultyStatus = this.getAttribute('data-faculty-status');
+            
+            // Update the form action URL
+            archiveForm.action = `/faculty/${facultyId}/status`;
+            
+            // Update the user name in the confirmation message
+            archiveUserNameSpan.textContent = facultyName;
+            
+            // Update the action text and button text based on current status
+            if (facultyStatus === 'active') {
+                archiveActionTextSpan.textContent = 'archive';
+                archiveSubmitBtn.textContent = 'Archive User';
+                archiveSubmitBtn.classList.remove('bg-gradient-success');
+                archiveSubmitBtn.classList.add('bg-gradient-warning');
+            } else {
+                archiveActionTextSpan.textContent = 'restore';
+                archiveSubmitBtn.textContent = 'Restore User';
+                archiveSubmitBtn.classList.remove('bg-gradient-warning');
+                archiveSubmitBtn.classList.add('bg-gradient-success');
+            }
         });
+    });
 
- 
-   // Toast auto-hide functionality
-   const toast = document.querySelector('.toast');
+    // Toast auto-hide functionality
+    const toast = document.querySelector('.toast');
     if (toast) {
         // For validation errors with multiple messages, give more time to read
         const hasValidationErrors = toast.querySelectorAll('.toast-body ul li').length > 0;
