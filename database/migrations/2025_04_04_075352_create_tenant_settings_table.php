@@ -15,6 +15,8 @@ return new class extends Migration
             $table->id();
             $table->string('primary_color')->default('#3490dc');
             $table->string('secondary_color')->default('#6c757d');
+            $table->string('tertiary_color')->default('#1a237e');
+            $table->string('imglogin_url')->nullable();
             $table->string('logo_url')->nullable();
             $table->string('header_text')->default('Welcome to Our Platform');
             $table->text('welcome_message')->nullable();

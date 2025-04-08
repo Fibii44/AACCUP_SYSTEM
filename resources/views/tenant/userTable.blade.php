@@ -39,8 +39,8 @@
                                 <span class="badge badge-sm bg-gradient-success">User</span>
                             </td>
                             <td>
-                                <span class="badge badge-sm {{ $member->email_verified_at ? 'bg-gradient-success' : 'bg-gradient-secondary' }}">
-                                    {{ $member->email_verified_at ? 'Active' : 'Pending' }}
+                                <span class="badge badge-sm {{ $member->status === 'active' ? 'bg-gradient-success' : 'bg-gradient-secondary' }}">
+                                    {{ ucfirst($member->status) }}
                                 </span>
                             </td>
                             
