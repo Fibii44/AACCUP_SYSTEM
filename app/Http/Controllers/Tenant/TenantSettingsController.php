@@ -31,6 +31,8 @@ class TenantSettingsController extends Controller
             'logo_url',
             'primary_color',
             'secondary_color',
+            'header_text',
+            'welcome_message',
             'footer_text'
         ]));
         

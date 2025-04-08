@@ -57,6 +57,27 @@
                                 </div>
                             </div>
 
+                             <!-- Header Text -->
+                             <div class="col-md-12 mt-4">
+                                <div class="form-group">
+                                    <label for="header_text" class="form-control-label">Header Text</label>
+                                    <input type="text" class="form-control" id="header_text" name="header_text" 
+                                           placeholder="Enter your header text here..."
+                                           value="{{ $settings->header_text ?? 'Welcome to Our Platform' }}">
+                                    <small class="text-muted">This text will appear in the header of your pages</small>
+                                </div>
+                            </div>
+
+                            <!-- Welcome Message -->
+                            <div class="col-md-12 mt-4">
+                                <div class="form-group">
+                                    <label for="welcome_message" class="form-control-label">Welcome Message</label>
+                                    <textarea class="form-control" id="welcome_message" name="welcome_message" rows="3" 
+                                              placeholder="Enter your welcome message here...">{{ $settings->welcome_message ?? '' }}</textarea>
+                                    <small class="text-muted">This message will be displayed on your landing page</small>
+                                </div>
+                            </div>
+
                             <!-- Footer Text -->
                             <div class="col-md-12 mt-4">
                                 <div class="form-group">
