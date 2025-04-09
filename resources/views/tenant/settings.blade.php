@@ -50,6 +50,21 @@
                                     
                                     <div class="row">
                                    
+                                        <!-- DB Default Palette -->
+                                        <div class="col-md-4 mb-3">
+                                            <div class="palette-option {{ ($settings->primary_color == '#3490dc' && $settings->secondary_color == '#6c757d' && $settings->tertiary_color == '#1a237e') ? 'selected' : '' }}" 
+                                                 onclick="selectPalette('dbdefault', '#3490dc', '#6c757d', '#1a237e', this)">
+                                                <div class="palette-preview">
+                                                    <div style="background-color: #3490dc; flex: 1;"></div>
+                                                    <div style="background-color: #6c757d; flex: 1;"></div>
+                                                    <div style="background-color: #1a237e; flex: 1;"></div>
+                                                </div>
+                                                <div class="palette-name">Database Default</div>
+                                            </div>
+                                        </div>
+                                        
+                                    
+
                                         <!-- Professional Dark Palette -->
                                         <div class="col-md-4 mb-3">
                                             <div class="palette-option {{ ($settings->primary_color == '#6366F1' && $settings->secondary_color == '#8B5CF6' && $settings->tertiary_color == '#EC4899') ? 'selected' : '' }}" 
@@ -99,12 +114,13 @@
                                     <input type="hidden" id="secondary_color" name="secondary_color" value="{{ $settings->secondary_color ?? '#6c757d' }}">
                                     <input type="hidden" id="tertiary_color" name="tertiary_color" value="{{ $settings->tertiary_color ?? '#e3342f' }}">
                                     <input type="hidden" id="palette" name="palette" value="{{ 
-                                        ($settings->primary_color == '#3490dc' && $settings->secondary_color == '#6c757d' && $settings->tertiary_color == '#e3342f') ? 'default' : 
+                                        ($settings->primary_color == '#3490dc' && $settings->secondary_color == '#6c757d' && $settings->tertiary_color == '#1a237e') ? 'dbdefault' :
+                                        (($settings->primary_color == '#3490dc' && $settings->secondary_color == '#6c757d' && $settings->tertiary_color == '#e3342f') ? 'default' : 
                                         (($settings->primary_color == '#38c172' && $settings->secondary_color == '#4dc0b5' && $settings->tertiary_color == '#f6993f') ? 'nature' : 
                                         (($settings->primary_color == '#9561e2' && $settings->secondary_color == '#f66d9b' && $settings->tertiary_color == '#ffed4a') ? 'creative' : 
                                         (($settings->primary_color == '#6366F1' && $settings->secondary_color == '#8B5CF6' && $settings->tertiary_color == '#EC4899') ? 'professional' : 
                                         (($settings->primary_color == '#EF4444' && $settings->secondary_color == '#B91C1C' && $settings->tertiary_color == '#FCA5A5') ? 'red' : 
-                                        (($settings->primary_color == '#F97316' && $settings->secondary_color == '#FB923C' && $settings->tertiary_color == '#FFEDD5') ? 'orange' : '')))))
+                                        (($settings->primary_color == '#F97316' && $settings->secondary_color == '#FB923C' && $settings->tertiary_color == '#FFEDD5') ? 'orange' : ''))))))
                                     }}">
                                 </div>
                             </div>
