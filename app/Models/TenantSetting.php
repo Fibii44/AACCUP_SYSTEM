@@ -12,6 +12,7 @@ class TenantSetting extends Model
     protected $fillable = [
         'primary_color',
         'secondary_color',
+        'tertiary_color',
         'logo_url',
         'header_text',
         'welcome_message',

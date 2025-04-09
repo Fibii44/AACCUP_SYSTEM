@@ -51,7 +51,6 @@ Route::middleware([
             // Admin management routes
             Route::get('/admin/landing-settings', [LandingPageController::class, 'index'])
                 ->name('tenant.landing-settings');
-
             Route::post('/admin/landing-settings', [LandingPageController::class, 'updateSettings'])
                 ->name('tenant.landing-settings.update');
 
