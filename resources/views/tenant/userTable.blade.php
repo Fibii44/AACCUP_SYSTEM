@@ -1,17 +1,91 @@
 @extends('layouts.dashboardTemplate')
 
 @section('content')
+@php
+    // Get the tenant settings
+    $settings = \App\Models\TenantSetting::first() ?? new \App\Models\TenantSetting();
+    
+    // Get the colors with default fallbacks
+    $primaryColor = $settings->primary_color ?? '#3490dc';
+    $secondaryColor = $settings->secondary_color ?? '#6c757d';
+    $tertiaryColor = $settings->tertiary_color ?? '#1a237e';
+@endphp
+
+<style>
+    .card-header h6 {
+        color: {{ $tertiaryColor }};
+        font-weight: 600;
+    }
+    
+    .bg-gradient-primary {
+        background-image: linear-gradient(310deg, {{ $primaryColor }} 0%, {{ $secondaryColor }} 100%);
+    }
+    
+    .bg-gradient-warning {
+        background-image: linear-gradient(310deg, #fbb140 0%, {{ $secondaryColor }} 100%);
+    }
+    
+    .bg-gradient-success {
+        background-image: linear-gradient(310deg, #2dce89 0%, {{ $primaryColor }} 100%);
+    }
+    
+    .bg-gradient-info {
+        background-image: linear-gradient(310deg, {{ $primaryColor }} 0%, #1171ef 100%);
+    }
+    
+    .btn-primary {
+        background-color: {{ $primaryColor }};
+        border-color: {{ $primaryColor }};
+    }
+    
+    .btn-primary:hover {
+        background-color: {{ $primaryColor }}dd;
+        border-color: {{ $primaryColor }};
+    }
+    
+    .input-group-text {
+        border-color: {{ $secondaryColor }}40;
+    }
+    
+    .form-control:focus {
+        border-color: {{ $primaryColor }};
+    }
+</style>
+
 <div class="row">
     <div class="col-12">
-        <!-- Status Filter -->
-        <div class="mb-3 d-flex justify-content-end">
+        <!-- Status Filter and Search -->
+        <div class="mb-3 d-flex justify-content-between align-items-center">
+            <div class="d-flex">
+                <form action="{{ route('tenant.user-table') }}" method="GET" class="d-flex align-items-center">
+                    <div class="input-group me-3">
+                        <span class="input-group-text" style="height: 45px;"><i class="fas fa-search"></i></span>
+                        <input type="text" class="form-control form-control-sm" name="search" placeholder="Search by name or email" style="height: 45px;" value="{{ request('search') }}">
+                        <button type="submit" class="btn btn-sm btn-primary d-flex align-items-center" style="height: 45px;">Search</button>
+                        @if(request('search'))
+                            <a href="{{ route('tenant.user-table', ['status' => $statusFilter]) }}" class="btn btn-sm btn-outline-secondary ms-1 d-flex align-items-center" style="height: 45px;">
+                                <i class="fas fa-times"></i> Clear
+                            </a>
+                        @endif
+                    </div>
+                    <!-- Preserve status parameter when searching -->
+                    @if($statusFilter !== 'all')
+                        <input type="hidden" name="status" value="{{ $statusFilter }}">
+                    @endif
+                </form>
+            </div>
+            
             <form action="{{ route('tenant.user-table') }}" method="GET" class="d-flex align-items-center">
-                <label for="statusFilter" class="me-2 mb-0">Filter by status:</label>
+                <label for="statusFilter" class="me-2 mb-0" style="color: {{ $tertiaryColor }}; font-weight: 500;">Filter by status:</label>
                 <select name="status" id="statusFilter" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
                     <option value="all" {{ $statusFilter === 'all' ? 'selected' : '' }}>All Users</option>
                     <option value="active" {{ $statusFilter === 'active' ? 'selected' : '' }}>Active Users</option>
                     <option value="inactive" {{ $statusFilter === 'inactive' ? 'selected' : '' }}>Archived Users</option>
                 </select>
+                <!-- Preserve search parameter when changing status filter -->
+                @if(request('search'))
+                    <input type="hidden" name="search" value="{{ request('search') }}">
+                @endif
             </form>
         </div>
         
@@ -29,11 +103,11 @@
                     <table class="table align-items-center mb-0">
                         <thead>
                             <tr>
-                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Name</th>
-                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Role</th>
-                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Status</th>
-                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Date Added</th>        
-                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Actions</th>
+                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="color: {{ $tertiaryColor }}!important;">Name</th>
+                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="color: {{ $tertiaryColor }}!important;">Role</th>
+                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="color: {{ $tertiaryColor }}!important;">Status</th>
+                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="color: {{ $tertiaryColor }}!important;">Date Added</th>        
+                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="color: {{ $tertiaryColor }}!important;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -92,7 +166,13 @@
                                     <td colspan="5" class="text-center py-4">
                                         <div class="d-flex flex-column align-items-center">
                                             <i class="fas fa-users-slash text-secondary mb-2" style="font-size: 2rem;"></i>
-                                            <p class="mb-0">No users found matching the selected filter.</p>
+                                            <p class="mb-0">
+                                                @if(request('search'))
+                                                    No users found matching "{{ request('search') }}" {{ $statusFilter !== 'all' ? 'with ' . $statusFilter . ' status' : '' }}.
+                                                @else
+                                                    No users found matching the selected filter.
+                                                @endif
+                                            </p>
                                         </div>
                                     </td>
                                 </tr>

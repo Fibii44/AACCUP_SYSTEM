@@ -21,6 +21,7 @@ class TenantFacultyController extends Controller
     public function index(Request $request)
     {
         $statusFilter = $request->input('status', 'all');
+        $searchQuery = $request->input('search');
         
         $query = User::where('role', 'user');
         
@@ -29,9 +30,17 @@ class TenantFacultyController extends Controller
             $query->where('status', $statusFilter);
         }
         
+        // Apply search if provided
+        if ($searchQuery) {
+            $query->where(function($q) use ($searchQuery) {
+                $q->where('name', 'like', '%' . $searchQuery . '%')
+                  ->orWhere('email', 'like', '%' . $searchQuery . '%');
+            });
+        }
+        
         $faculty = $query->get();
         
-        return view('tenant.userTable', compact('faculty', 'statusFilter'));
+        return view('tenant.userTable', compact('faculty', 'statusFilter', 'searchQuery'));
     }
 
     /**

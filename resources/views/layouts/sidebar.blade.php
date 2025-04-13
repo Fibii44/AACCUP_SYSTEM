@@ -1,12 +1,129 @@
-<aside class="sidenav navbar navbar-vertical navbar-expand-xs border-0 border-radius-xl my-3 fixed-start ms-3 " id="sidenav-main">
+@php
+    // Get the tenant settings
+    $settings = \App\Models\TenantSetting::first() ?? new \App\Models\TenantSetting();
+    
+    // Get the colors with default fallbacks
+    $primaryColor = $settings->primary_color ?? '#3490dc';
+    $secondaryColor = $settings->secondary_color ?? '#6c757d';
+    $tertiaryColor = $settings->tertiary_color ?? '#1a237e';
+    
+    // Create a slightly lighter version of primary for hover effects
+    $primaryColorLight = $primaryColor . '20'; // Adding 20% opacity
+@endphp
+<!-- {{ $primaryColor }} -->
+<style>
+    /* Custom styles using the tenant colors */
+    .navbar-vertical.bg-white {
+        background-color: white !important;
+        box-shadow: 0 0 2rem 0 rgba(136, 152, 170, .15);
+    }
+    
+    .navbar-vertical .navbar-brand-img {
+        max-height: 40px;
+    }
+    
+    /* Normal nav link styling */
+    .navbar-vertical .navbar-nav .nav-link {
+        color: #344767 !important;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        border-radius: 0.375rem;
+        margin: 0.15rem 0.5rem;
+    }
+    
+    /* Active nav link styling */
+    .navbar-vertical .navbar-nav .nav-link.active {
+        background-color: {{ $primaryColor }};
+        color: white !important;
+        font-weight: 600;
+        box-shadow: 0 3px 5px 0 rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Hover effect for non-active nav links */
+    .navbar-vertical .navbar-nav .nav-link:hover:not(.active) {
+        background-color: {{ $primaryColor }};
+        color: {{ $primaryColor }} !important;
+    }
+    
+    /* Nav link text color */
+    .navbar-vertical .nav-link-text {
+        color: #344767;
+    }
+    
+    /* Active nav link text color */
+    .navbar-vertical .nav-link.active .nav-link-text {
+        color: {{ $primaryColor }} !important;
+    }
+    
+    /* Section titles */
+    .navbar-vertical .text-xs.font-weight-bolder.opacity-6 {
+        color: {{ $primaryColor }} !important;
+        opacity: 1 !important;
+        font-weight: 600 !important;
+        letter-spacing: 0.5px;
+    }
+    
+    /* Icon backgrounds */
+    .navbar-vertical .icon-shape {
+        background: #fff !important;
+        border: 1px solid #e9ecef;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    }
+    
+    /* Icon colors */
+    .navbar-vertical .nav-link .icon-shape svg g [fill] {
+        fill: {{ $secondaryColor }} !important;
+    }
+    
+    /* Active icon styling */
+    .navbar-vertical .nav-link.active .icon-shape {
+        background: {{ $secondaryColor }} !important;
+        border: 1px solid {{ $primaryColor }};
+    }
+    
+    /* Fix SVG colors */
+    .navbar-vertical .color-background, 
+    .navbar-vertical .color-background.opacity-6 {
+        fill: {{ $secondaryColor }} !important;
+    }
+    
+    /* Active icon styling - override SVG fills for active state */
+    .navbar-vertical .nav-link.active .icon-shape svg g [fill],
+    .navbar-vertical .nav-link.active .color-background,
+    .navbar-vertical .nav-link.active .color-background.opacity-6 {
+        fill: white!important;
+    }
+    
+    /* Horizontal divider */
+    .navbar-vertical hr.horizontal.light {
+        background-color: #e9ecef;
+        height: 1px;
+    }
+    
+    /* Brand name styling */
+    .navbar-vertical.bg-white .sidenav-header .navbar-brand {
+        color: #344767;
+    }
+    
+    /* Sidenav footer */
+    .sidenav-footer .card {
+        border: 1px solid #e9ecef;
+    }
+</style>
+
+<aside class="sidenav navbar navbar-vertical navbar-expand-xs border-0 border-radius-xl bg-white my-3 fixed-start ms-3" id="sidenav-main">
     <div class="sidenav-header">
       <i class="fas fa-times p-3 cursor-pointer text-secondary opacity-5 position-absolute end-0 top-0 d-none d-xl-none" aria-hidden="true" id="iconSidenav"></i>
-      <a class="navbar-brand m-0" href=" https://demos.creative-tim.com/soft-ui-dashboard/pages/dashboard.html " target="_blank">
-        <img src="../assets/img/logo-ct-dark.png" class="navbar-brand-img h-100" alt="main_logo">
-        <span class="ms-1 font-weight-bold">Soft UI Dashboard 3</span>
+      <a class="navbar-brand m-0" href="{{ route('tenant.dashboard') }}">
+        @if(isset($settings->logo_url) && $settings->logo_url)
+            <img src="{{ asset($settings->logo_url) }}" class="navbar-brand-img h-100" alt="logo">
+        @else
+            <img src="{{ asset('assets/img/logo-ct-dark.png') }}" class="navbar-brand-img h-100" alt="default_logo">
+        @endif
+        <span class="ms-1 font-weight-bold" style="color: {{ $primaryColor }} !important;">{{ config('app.name', 'AACCUP') }}</span>
       </a>
     </div>
-    <hr class="horizontal dark mt-0">
+    <hr class="horizontal dark mt-0 mb-2">
     <div class="collapse navbar-collapse  w-auto " id="sidenav-collapse-main">
       <ul class="navbar-nav">
         @if(auth()->user()->role === 'user')

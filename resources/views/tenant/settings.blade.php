@@ -158,7 +158,7 @@
 
                             <!-- Submit Button -->
                             <div class="col-md-12 mt-4">
-                                <button type="submit" class="btn bg-gradient-primary">Save Settings</button>
+                                <button type="submit" class="btn bg-gradient-primary" style="background-image: linear-gradient(310deg, {{ $settings->primary_color ?? '#3490dc' }} 0%, {{ $settings->secondary_color ?? '#6c757d' }} 100%);">Save Settings</button>
                             </div>
                         </div>
                     </form>
@@ -169,6 +169,21 @@
 </div>
 
 <style>
+    @php
+    $primaryColor = $settings->primary_color ?? '#3490dc';
+    $secondaryColor = $settings->secondary_color ?? '#6c757d';
+    $tertiaryColor = $settings->tertiary_color ?? '#1a237e';
+    @endphp
+
+    .card-header {
+        color: {{ $tertiaryColor }};
+    }
+    
+    .form-control-label {
+        color: {{ $tertiaryColor }};
+        font-weight: 600;
+    }
+
     .palette-option {
         cursor: pointer;
         border: 2px solid #eee;
@@ -183,8 +198,8 @@
     }
     
     .palette-option.selected {
-        border-color: #5e72e4;
-        box-shadow: 0 4px 10px rgba(94,114,228,0.3);
+        border-color: {{ $primaryColor }};
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         transform: translateY(-3px);
     }
     
@@ -199,6 +214,12 @@
         background: #f8f9fa;
         font-weight: 600;
         font-size: 0.85rem;
+        color: {{ $tertiaryColor }};
+    }
+
+    #palette-status {
+        color: {{ $primaryColor }} !important;
+        font-weight: 600;
     }
 </style>
 
