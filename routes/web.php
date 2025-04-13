@@ -5,6 +5,7 @@ use App\Http\Controllers\LandingController;
 use App\Http\Controllers\LandingPageController;
 use App\Http\Controllers\TenantRequestController;
 use App\Http\Controllers\TenantSettingsController;
+use App\Http\Controllers\Admin\TenantController;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
@@ -26,8 +27,10 @@ Route::domain(config('app.url'))->group(function () {
     // Admin dashboard routes
     Route::middleware(['auth', 'verified'])->prefix('admin')->group(function () {
         Route::get('/dashboard', function () {
-            return view('dashboard');
+            return view('central.admin.dashboard');
         })->name('dashboard');
+
+        Route::get('tenants', [TenantController::class, 'index'])->name('tenants');
         
         // Tenant approval routes
         Route::get('/tenant-requests', [TenantApprovalController::class, 'index'])->name('admin.tenant-requests.index');
@@ -48,6 +51,12 @@ Route::domain(config('app.url'))->group(function () {
         // Tenant settings routes
         Route::get('/settings', [TenantSettingsController::class, 'index'])->name('tenant.settings');
         Route::patch('/settings', [TenantSettingsController::class, 'update'])->name('tenant.settings.update');
+
+        // Tenant Management Routes
+        Route::post('/admin/tenants/{tenant}/enable', [TenantController::class, 'enable'])->name('admin.tenants.enable');
+        Route::post('/admin/tenants/{tenant}/disable', [TenantController::class, 'disable'])->name('admin.tenants.disable');
+        Route::post('/admin/tenants/{tenant}/upgrade', [TenantController::class, 'upgrade'])->name('admin.tenants.upgrade');
+        Route::post('/admin/tenants/{tenant}/downgrade', [TenantController::class, 'downgrade'])->name('admin.tenants.downgrade');
     });
 });
 
