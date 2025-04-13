@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Route;
 use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 use App\Http\Middleware\CheckTenantDomainStatus;
+use App\Http\Middleware\CheckUserStatus;
 
 
 
@@ -32,6 +33,7 @@ Route::middleware([
     PreventAccessFromCentralDomains::class,
     InitializeTenancyByDomain::class,
     CheckTenantDomainStatus::class,
+    CheckUserStatus::class,
 ])->group(function () {
     Route::get('/', function () {
         return view('tenant.welcome');

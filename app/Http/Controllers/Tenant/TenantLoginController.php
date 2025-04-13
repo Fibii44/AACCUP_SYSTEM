@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Session;
 
 class TenantLoginController extends Controller
 {
@@ -60,14 +61,22 @@ class TenantLoginController extends Controller
         if (Auth::attempt($request->only('email', 'password'), $request->filled('remember'))) {
             $request->session()->regenerate();
             
+            // Get the authenticated user
+            $user = Auth::user();
+            
+            // Check if user is inactive/archived
+            if ($user->status === 'inactive') {
+                Auth::logout();
+                throw ValidationException::withMessages([
+                    'email' => ['Your account has been archived. Please contact your administrator for assistance.'],
+                ]);
+            }
+            
             // Log successful login
             Log::info('Tenant user logged in successfully', [
                 'email' => $request->email,
                 'domain' => $request->getHost()
             ]);
-            
-            // Get the authenticated user
-            $user = Auth::user();
             
             // Redirect based on user role
             if ($user->role === 'user') {
@@ -137,4 +146,6 @@ class TenantLoginController extends Controller
             return $settings;
         }
     }
+    
+   
 }

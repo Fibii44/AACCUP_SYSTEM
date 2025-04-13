@@ -71,7 +71,16 @@
             <div class="error-details">
                 The page you are looking for might have been removed, had its name changed, or is temporarily unavailable.
             </div>
-            <a href="{{ route('landing') }}" class="btn btn-primary">Return to Home</a>
+            
+            @auth
+                @if(auth()->user()->role === 'admin')
+                    <a href="{{ route('tenant.dashboard') }}" class="btn btn-primary">Go to Dashboard</a>
+                @else
+                    <a href="{{ route('tenant.facultyDashboard') }}" class="btn btn-primary">Go to Faculty Dashboard</a>
+                @endif
+            @else
+                <a href="{{ route('tenant.welcome') }}" class="btn btn-primary">Return to Home</a>
+            @endauth
         </div>
     </div>
 </body>

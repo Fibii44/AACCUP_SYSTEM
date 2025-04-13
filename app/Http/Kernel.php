@@ -36,6 +36,7 @@ class Kernel extends HttpKernel
             \Illuminate\View\Middleware\ShareErrorsFromSession::class,
             \App\Http\Middleware\VerifyCsrfToken::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            \App\Http\Middleware\CheckUserStatus::class,
         ],
 
         'api' => [
@@ -67,5 +68,6 @@ class Kernel extends HttpKernel
         'check.tenant.domain' => \App\Http\Middleware\CheckTenantDomainStatus::class,
         'initialize-tenant-by-domain' => \App\Http\Middleware\InitializeTenancyByDomain::class,
         'role' => \App\Http\Middleware\RoleMiddleware::class,
+        'check.user.status' => \App\Http\Middleware\CheckUserStatus::class,
     ];
 } 
