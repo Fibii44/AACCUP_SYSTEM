@@ -12,71 +12,21 @@
 @endphp
 
 <style>
-    .card-header h6 {
-        color: {{ $tertiaryColor }};
-        font-weight: 600;
-    }
+    
     
     .bg-gradient-primary {
         background-image: linear-gradient(310deg, {{ $primaryColor }} 0%, {{ $secondaryColor }} 100%);
     }
     
-    .bg-gradient-warning {
-        background-image: linear-gradient(310deg, #fbb140 0%, {{ $secondaryColor }} 100%);
-    }
-    
-    .bg-gradient-success {
-        background-image: linear-gradient(310deg, #2dce89 0%, {{ $primaryColor }} 100%);
-    }
-    
-    .bg-gradient-info {
-        background-image: linear-gradient(310deg, {{ $primaryColor }} 0%, #1171ef 100%);
-    }
-    
-    .btn-primary {
-        background-color: {{ $primaryColor }};
-        border-color: {{ $primaryColor }};
-    }
-    
-    .btn-primary:hover {
-        background-color: {{ $primaryColor }}dd;
-        border-color: {{ $primaryColor }};
-    }
-    
-    .input-group-text {
-        border-color: {{ $secondaryColor }}40;
-    }
-    
-    .form-control:focus {
-        border-color: {{ $primaryColor }};
-    }
+ 
 </style>
 
 <div class="row">
     <div class="col-12">
-        <!-- Status Filter and Search -->
-        <div class="mb-3 d-flex justify-content-between align-items-center">
-            <div class="d-flex">
-                <form action="{{ route('tenant.user-table') }}" method="GET" class="d-flex align-items-center">
-                    <div class="input-group me-3">
-                        <span class="input-group-text" style="height: 45px;"><i class="fas fa-search"></i></span>
-                        <input type="text" class="form-control form-control-sm" name="search" placeholder="Search by name or email" style="height: 45px;" value="{{ request('search') }}">
-                        <button type="submit" class="btn btn-sm btn-primary d-flex align-items-center" style="height: 45px;">Search</button>
-                        @if(request('search'))
-                            <a href="{{ route('tenant.user-table', ['status' => $statusFilter]) }}" class="btn btn-sm btn-outline-secondary ms-1 d-flex align-items-center" style="height: 45px;">
-                                <i class="fas fa-times"></i> Clear
-                            </a>
-                        @endif
-                    </div>
-                    <!-- Preserve status parameter when searching -->
-                    @if($statusFilter !== 'all')
-                        <input type="hidden" name="status" value="{{ $statusFilter }}">
-                    @endif
-                </form>
-            </div>
-            
+        <!-- Status Filter -->
+        <div class="mb-3 d-flex justify-content-end align-items-center">
             <form action="{{ route('tenant.user-table') }}" method="GET" class="d-flex align-items-center">
-                <label for="statusFilter" class="me-2 mb-0" style="color: {{ $tertiaryColor }}; font-weight: 500;">Filter by status:</label>
+                <label for="statusFilter" class="me-2 mb-0"  font-weight: 500;">Filter by status:</label>
                 <select name="status" id="statusFilter" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
                     <option value="all" {{ $statusFilter === 'all' ? 'selected' : '' }}>All Users</option>
                     <option value="active" {{ $statusFilter === 'active' ? 'selected' : '' }}>Active Users</option>
@@ -103,11 +53,11 @@
                     <table class="table align-items-center mb-0">
                         <thead>
                             <tr>
-                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="color: {{ $tertiaryColor }}!important;">Name</th>
-                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="color: {{ $tertiaryColor }}!important;">Role</th>
-                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="color: {{ $tertiaryColor }}!important;">Status</th>
-                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="color: {{ $tertiaryColor }}!important;">Date Added</th>        
-                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="color: {{ $tertiaryColor }}!important;">Actions</th>
+                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" ">Name</th>
+                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" ">Role</th>
+                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" ">Status</th>
+                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" ">Date Added</th>        
+                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" ">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
