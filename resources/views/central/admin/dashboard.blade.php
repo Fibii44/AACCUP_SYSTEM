@@ -110,7 +110,7 @@
             <!-- Recent Department Registration Requests -->
             <div class="bg-white rounded-lg shadow-sm overflow-hidden mb-8">
                 <div class="px-6 py-5 border-b border-gray-200">
-                    <h3 class="text-lg font-semibold text-gray-500 p-6">Recent Department Registration Requests</h3>
+                    <h3 class="text-lg font-semibold text-gray-500">Recent Department Registration Requests</h3>
                 </div>
                 
                 @php

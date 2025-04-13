@@ -19,12 +19,12 @@ class TenantApprovalController extends Controller
     public function index()
     {
         $pendingRequests = TenantRequest::where('status', 'pending')->get();
-        return view('admin.tenant-requests.index', compact('pendingRequests'));
+        return view('central.admin.tenant-requests.index', compact('pendingRequests'));
     }
     
     public function show(TenantRequest $tenantRequest)
     {
-        return view('admin.tenant-requests.show', compact('tenantRequest'));
+        return view('central.admin.tenant-requests.show', compact('tenantRequest'));
     }
     
     public function approve(TenantRequest $tenantRequest)

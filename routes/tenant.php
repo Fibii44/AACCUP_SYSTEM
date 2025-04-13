@@ -9,6 +9,7 @@ use App\Http\Middleware\RoleMiddleware;
 use Illuminate\Support\Facades\Route;
 use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
+use App\Http\Middleware\CheckTenantDomainStatus;
 
 
 
@@ -27,9 +28,14 @@ use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 
 Route::middleware([
     'web',
-    InitializeTenancyByDomain::class,
     PreventAccessFromCentralDomains::class,
+    InitializeTenancyByDomain::class,
+    CheckTenantDomainStatus::class,
 ])->group(function () {
+    Route::get('/', function () {
+        return view('tenant.welcome');
+    })->name('tenant.welcome');
+
     // Landing page for tenants (customizable)
     Route::get('/', [LandingPageController::class, 'index'])->name('landing');
     

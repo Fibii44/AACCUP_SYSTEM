@@ -48,6 +48,39 @@ class Tenant extends BaseTenant implements TenantWithDatabase
             'id',
             'department_name',
             'email',
+            'plan',
+            'is_paid',
+            'is_domain_enabled',
         ];
+    }
+
+    public function isDomainEnabled(): bool
+    {
+        return $this->is_domain_enabled;
+    }
+
+    public function enableDomain(): void
+    {
+        $this->update(['is_domain_enabled' => true]);
+    }
+
+    public function disableDomain(): void
+    {
+        $this->update(['is_domain_enabled' => false]);
+    }
+
+    public function isPremium(): bool
+    {
+        return $this->plan === 'premium';
+    }
+
+    public function upgradeToPremium(): void
+    {
+        $this->update(['plan' => 'premium']);
+    }
+
+    public function downgradeToFree(): void
+    {
+        $this->update(['plan' => 'free']);
     }
 }
