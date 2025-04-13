@@ -37,6 +37,18 @@
             }
         }
 
+        /* Fixed dropdown positioning */
+        .dropdown-fixed {
+            position: absolute !important;
+            z-index: 100 !important;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+        }
+
+        /* Ensure dropdown appears on top of all other content */
+        [x-data="{ open: false }"] {
+            position: relative;
+        }
+
         .dataTables_wrapper .dataTables_length select {
             padding-right: 2.5rem;
             border-radius: 0.375rem;
@@ -148,7 +160,7 @@
                                     </td>
                                     <td class="px-3 py-4 text-right">
                                         <div x-data="{ open: false }" class="relative inline-block text-left">
-                                            <button @click="open = !open" type="button" class="px-3 py-1.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 inline-flex items-center">
+                                            <button @click="open = !open" x-dropdown type="button" class="px-3 py-1.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 inline-flex items-center">
                                                 Actions
                                                 <svg class="ml-2 -mr-0.5 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
@@ -163,7 +175,8 @@
                                                  x-transition:leave="transition ease-in duration-75"
                                                  x-transition:leave-start="transform opacity-100 scale-100"
                                                  x-transition:leave-end="transform opacity-0 scale-95"
-                                                 class="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50">
+                                                 class="dropdown-fixed absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50"
+                                                 style="position: fixed; min-width: 12rem; margin-top: 0.5rem;">
                                                 <div class="py-1" role="menu" aria-orientation="vertical">
                                                     @if($tenant->is_domain_enabled)
                                                         <form action="{{ route('admin.tenants.disable', $tenant) }}" method="POST" class="block">
@@ -252,6 +265,20 @@
             // Add custom classes to the search input
             $('.dataTables_filter input').addClass('focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400');
             $('.dataTables_length select').addClass('focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400');
+            
+            // Fix dropdown positioning
+            document.addEventListener('alpine:init', () => {
+                Alpine.directive('dropdown', (el, { expression }, { evaluate }) => {
+                    el.addEventListener('click', (e) => {
+                        const dropdown = el.parentElement.querySelector('[x-show="open"]');
+                        if (dropdown) {
+                            const rect = el.getBoundingClientRect();
+                            dropdown.style.top = `${rect.bottom + window.scrollY}px`;
+                            dropdown.style.left = `${rect.right - dropdown.offsetWidth + window.scrollX}px`;
+                        }
+                    });
+                });
+            });
         });
     </script>
     @endpush
