@@ -2,9 +2,7 @@
 
 use App\Http\Controllers\Admin\TenantApprovalController;
 use App\Http\Controllers\LandingController;
-use App\Http\Controllers\LandingPageController;
 use App\Http\Controllers\TenantRequestController;
-use App\Http\Controllers\TenantSettingsController;
 use App\Http\Controllers\Admin\TenantController;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
@@ -43,14 +41,6 @@ Route::domain(config('app.url'))->group(function () {
         Volt::route('settings/profile', 'settings.profile')->name('settings.profile');
         Volt::route('settings/password', 'settings.password')->name('settings.password');
         Volt::route('settings/appearance', 'settings.appearance')->name('settings.appearance');
-        
-        // Landing page settings
-        Route::get('/landing-settings', [LandingPageController::class, 'index'])->name('admin.landing-settings');
-        Route::post('/landing-settings', [LandingPageController::class, 'updateSettings'])->name('admin.landing-settings.update');
-        
-        // Tenant settings routes
-        Route::get('/settings', [TenantSettingsController::class, 'index'])->name('tenant.settings');
-        Route::patch('/settings', [TenantSettingsController::class, 'update'])->name('tenant.settings.update');
 
         // Tenant Management Routes
         Route::post('/admin/tenants/{tenant}/enable', [TenantController::class, 'enable'])->name('admin.tenants.enable');
