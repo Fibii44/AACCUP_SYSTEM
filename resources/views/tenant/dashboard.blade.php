@@ -1,6 +1,20 @@
 @extends('layouts.dashboardTemplate')
 
 @section('content')
+@php
+    // Get the tenant settings
+    $settings = \App\Models\TenantSetting::first() ?? new \App\Models\TenantSetting();
+    
+    // Get the colors with default fallbacks
+    $primaryColor = $settings->primary_color ?? '#3490dc';
+    $secondaryColor = $settings->secondary_color ?? '#6c757d';
+    $tertiaryColor = $settings->tertiary_color ?? '#1a237e';
+    
+    // Create a slightly lighter version of primary for hover effects
+    $primaryColorLight = $primaryColor . '20'; // Adding 20% opacity
+@endphp
+
+
 <div class="row">
         <div class="col-lg-6 col-12">
           <div class="row">
@@ -508,7 +522,7 @@
                 </div>
                 <div class="timeline-block mb-3">
                   <span class="timeline-step">
-                    <i class="ni ni-credit-card text-warning text-gradient"></i>
+                    <i class="ni ni-credit-card text-primary text-gradient" style="color: {{ $primaryColor }} !important;"></i>
                   </span>
                   <div class="timeline-content">
                     <h6 class="text-dark text-sm font-weight-bold mb-0">New card added for order #4395133</h6>
@@ -647,7 +661,7 @@
                   </div>
                   <div class="col-3 py-3 ps-0">
                     <div class="d-flex mb-2">
-                      <div class="icon icon-shape icon-xxs shadow border-radius-sm bg-gradient-warning text-center me-2 d-flex align-items-center justify-content-center">
+                      <div class="icon icon-shape icon-xxs shadow border-radius-sm bg-gradient-primary text-center me-2 d-flex align-items-center justify-content-center" style="background-image: linear-gradient(310deg, {{ $primaryColor }} 0%, {{ $primaryColor }} 100%);">
                         <svg width="10px" height="10px" viewBox="0 0 43 36" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
                           <title>credit-card</title>
                           <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
@@ -716,4 +730,73 @@
           </div>
         </div>
       </div>
+      <style>
+  .bg-custom-primary {
+    background-color: {{ $primaryColor }};
+  }
+  .bg-custom-secondary {
+    background-color: {{ $secondaryColor }};
+  }
+  .bg-custom-tertiary {
+    background-color: {{ $tertiaryColor }};
+  }
+  .text-custom-primary {
+    color: {{ $primaryColor }} !important;
+  }
+  .text-custom-secondary {
+    color: {{ $secondaryColor }} !important;
+  }
+  .text-custom-tertiary {
+    color: {{ $tertiaryColor }} !important;
+  }
+  .custom-gradient-primary {
+    background-image: linear-gradient(310deg, {{ $primaryColor }} 0%, {{ $primaryColor }} 100%);
+  }
+  .border-custom-primary {
+    border-color: {{ $primaryColor }} !important;
+  }
+  
+  /* Additional styling for the pink theme */
+  .card {
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+    border-radius: 10px;
+    border: none;
+  }
+  
+  .card-header {
+    color: {{ $tertiaryColor }};
+    font-weight: 600;
+  }
+  
+  .bg-gradient-primary, .bg-primary {
+    background: {{ $primaryColor }} !important;
+    background-image: none !important;
+  }
+  
+  .bg-gradient-success {
+    background: #2dcb73 !important;
+    background-image: none !important;
+  }
+  
+  .bg-gradient-info {
+    background: #17c1e8 !important;
+    background-image: none !important;
+  }
+  
+  .progress-bar.bg-primary {
+    background-color: {{ $primaryColor }} !important;
+  }
+  
+  .text-primary {
+    color: {{ $primaryColor }} !important;
+  }
+  
+  .text-info {
+    color: #17c1e8 !important;
+  }
+  
+  .mask.bg-primary {
+    background-color: {{ $primaryColor }} !important;
+  }
+</style>
 @endsection 

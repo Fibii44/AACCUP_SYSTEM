@@ -21,13 +21,15 @@
         } elseif ($primaryColor == '#6366F1' && $secondaryColor == '#8B5CF6' && $tertiaryColor == '#EC4899') {
             $currentPalette = 'professional';
         } elseif ($primaryColor == '#EF4444' && $secondaryColor == '#B91C1C' && $tertiaryColor == '#FCA5A5') {
-            $currentPalette = 'red';
-        } elseif ($primaryColor == '#F97316' && $secondaryColor == '#FB923C' && $tertiaryColor == '#FFEDD5') {
-            $currentPalette = 'orange';
+            $currentPalette = 'nursing';
+        } elseif ($primaryColor == '#ff85a9' && $secondaryColor == '#ffffffC' && $tertiaryColor == '#000000') {
+            $currentPalette = 'technologies';
         } elseif ($primaryColor == '#0EA5E9' && $secondaryColor == '#38BDF8' && $tertiaryColor == '#0C4A6E') {
             $currentPalette = 'blueocean';
         } elseif ($primaryColor == '#059669' && $secondaryColor == '#10B981' && $tertiaryColor == '#064E3B') {
             $currentPalette = 'emerald';
+        } elseif ($currentPalette == 'default' && !($primaryColor == '#3490dc' && $secondaryColor == '#6c757d' && $tertiaryColor == '#e3342f')) {
+            $currentPalette = 'custom';
         }
     }
 @endphp
@@ -93,29 +95,29 @@
                                             </div>
                                         </div>
                                         
-                                        <!-- Red Combination Palette -->
+                                        <!-- Nursing Combination Palette -->
                                         <div class="col-md-4 mb-3">
-                                            <div class="palette-option {{ ($settings->primary_color == '#EF4444' && $settings->secondary_color == '#B91C1C' && $settings->tertiary_color == '#FCA5A5') ? 'selected' : '' }}" 
-                                                 onclick="selectPalette('red', '#EF4444', '#B91C1C', '#FCA5A5', this)">
+                                            <div class="palette-option {{ ($settings->primary_color == '#ff85a9' && $settings->secondary_color == '#ffffffC' && $settings->tertiary_color == '#000000') ? 'selected' : '' }}" 
+                                                 onclick="selectPalette('nursing', '#ff85a9', '#ffffffC', '#000000', this)">
                                                 <div class="palette-preview">
-                                                    <div style="background-color: #EF4444; flex: 1;"></div>
-                                                    <div style="background-color: #B91C1C; flex: 1;"></div>
-                                                    <div style="background-color: #FCA5A5; flex: 1;"></div>
+                                                    <div style="background-color: #ff85a9; flex: 1;"></div>
+                                                    <div style="background-color: #ffffff; flex: 1;"></div>
+                                                    <div style="background-color: #000000; flex: 1;"></div>
                                                 </div>
-                                                <div class="palette-name">Ruby Red</div>
+                                                <div class="palette-name">Nursing Palette</div>
                                             </div>
                                         </div>
                                     
                                         <!-- Orange Combination Palette -->
                                         <div class="col-md-4 mb-3">
-                                            <div class="palette-option {{ ($settings->primary_color == '#F97316' && $settings->secondary_color == '#FB923C' && $settings->tertiary_color == '#FFEDD5') ? 'selected' : '' }}" 
-                                                 onclick="selectPalette('orange', '#F97316', '#FB923C', '#FFEDD5', this)">
+                                            <div class="palette-option {{ ($settings->primary_color == '#ff9238' && $settings->secondary_color == '#1d1aff' && $settings->tertiary_color == '#000000') ? 'selected' : '' }}" 
+                                                 onclick="selectPalette('technologies', '#ff9238', '#1d1aff', '#000000', this)">
                                                 <div class="palette-preview">
-                                                    <div style="background-color: #F97316; flex: 1;"></div>
-                                                    <div style="background-color: #FB923C; flex: 1;"></div>
-                                                    <div style="background-color: #FFEDD5; flex: 1;"></div>
+                                                    <div style="background-color: #ff9238; flex: 1;"></div>
+                                                    <div style="background-color: #1d1aff; flex: 1;"></div>
+                                                    <div style="background-color: #000000; flex: 1;"></div>
                                                 </div>
-                                                <div class="palette-name">Amber Orange</div>
+                                                <div class="palette-name">Technologies Palette</div>
                                             </div>
                                         </div>
 
@@ -176,6 +178,78 @@
                                                     @endif
                                                 </div>
                                             </div>
+                                        </div>
+                                        
+                                        <!-- Custom Color Palette (Premium) -->
+                                        <div class="col-12 mt-4 mb-3">
+                                            <h6>Custom Colors 
+                                                @if(!$isPremium)
+                                                    <span class="badge bg-warning text-dark ms-2">Premium Feature</span>
+                                                @endif
+                                            </h6>
+                                            
+                                            @if($isPremium)
+                                                <div class="row mt-3">
+                                                    <div class="col-md-4 mb-3">
+                                                        <label for="custom_primary_color" class="form-control-label">Primary Color</label>
+                                                        <input type="color" class="form-control form-control-color w-100" 
+                                                               id="custom_primary_color" 
+                                                               value="{{ $settings->primary_color ?? '#3490dc' }}"
+                                                               onchange="updateCustomPalette()">
+                                                    </div>
+                                                    <div class="col-md-4 mb-3">
+                                                        <label for="custom_secondary_color" class="form-control-label">Secondary Color</label>
+                                                        <input type="color" class="form-control form-control-color w-100" 
+                                                               id="custom_secondary_color" 
+                                                               value="{{ $settings->secondary_color ?? '#6c757d' }}"
+                                                               onchange="updateCustomPalette()">
+                                                    </div>
+                                                    <div class="col-md-4 mb-3">
+                                                        <label for="custom_tertiary_color" class="form-control-label">Tertiary Color</label>
+                                                        <input type="color" class="form-control form-control-color w-100" 
+                                                               id="custom_tertiary_color" 
+                                                               value="{{ $settings->tertiary_color ?? '#1a237e' }}"
+                                                               onchange="updateCustomPalette()">
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="row mt-2">
+                                                    <div class="col-md-12">
+                                                        <div class="custom-palette-preview mb-3">
+                                                            <div id="custom_primary_preview" style="background-color: {{ $settings->primary_color ?? '#3490dc' }}; flex: 1;"></div>
+                                                            <div id="custom_secondary_preview" style="background-color: {{ $settings->secondary_color ?? '#6c757d' }}; flex: 1;"></div>
+                                                            <div id="custom_tertiary_preview" style="background-color: {{ $settings->tertiary_color ?? '#1a237e' }}; flex: 1;"></div>
+                                                        </div>
+                                                        <button type="button" class="btn btn-sm btn-outline-primary" 
+                                                                onclick="selectCustomPalette()">
+                                                            Apply Custom Colors
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            @else
+                                                <div class="premium-locked p-3 rounded">
+                                                    <div class="palette-blur">
+                                                        <div class="row">
+                                                            <div class="col-md-4 mb-3">
+                                                                <label class="form-control-label">Primary Color</label>
+                                                                <div class="form-control form-control-color w-100"></div>
+                                                            </div>
+                                                            <div class="col-md-4 mb-3">
+                                                                <label class="form-control-label">Secondary Color</label>
+                                                                <div class="form-control form-control-color w-100"></div>
+                                                            </div>
+                                                            <div class="col-md-4 mb-3">
+                                                                <label class="form-control-label">Tertiary Color</label>
+                                                                <div class="form-control form-control-color w-100"></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm btn-warning mt-2" 
+                                                            onclick="showPremiumFeatureAlert()">
+                                                        <i class="fas fa-lock me-1"></i> Unlock Custom Colors
+                                                    </button>
+                                                </div>
+                                            @endif
                                         </div>
                                     </div>
                                     
@@ -294,6 +368,14 @@
         display: flex;
     }
     
+    .custom-palette-preview {
+        height: 60px;
+        display: flex;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 2px solid #eee;
+    }
+    
     .palette-name {
         padding: 6px;
         text-align: center;
@@ -320,6 +402,11 @@
     .premium-locked .palette-name {
         background-color: #fef3c7;
     }
+    
+    .form-control-color {
+        padding: 0.375rem;
+        height: 38px;
+    }
 </style>
 
 <script>
@@ -343,6 +430,42 @@
         
         // Optional: Log selection to console
         console.log(`Palette selected: ${paletteId}`, { primary, secondary, tertiary });
+    }
+    
+    function updateCustomPalette() {
+        const primaryColor = document.getElementById('custom_primary_color').value;
+        const secondaryColor = document.getElementById('custom_secondary_color').value;
+        const tertiaryColor = document.getElementById('custom_tertiary_color').value;
+        
+        // Update preview divs
+        document.getElementById('custom_primary_preview').style.backgroundColor = primaryColor;
+        document.getElementById('custom_secondary_preview').style.backgroundColor = secondaryColor;
+        document.getElementById('custom_tertiary_preview').style.backgroundColor = tertiaryColor;
+    }
+    
+    function selectCustomPalette() {
+        const primaryColor = document.getElementById('custom_primary_color').value;
+        const secondaryColor = document.getElementById('custom_secondary_color').value;
+        const tertiaryColor = document.getElementById('custom_tertiary_color').value;
+        
+        // Update hidden inputs
+        document.getElementById('primary_color').value = primaryColor;
+        document.getElementById('secondary_color').value = secondaryColor;
+        document.getElementById('tertiary_color').value = tertiaryColor;
+        document.getElementById('palette').value = 'custom';
+        
+        // Update UI - remove selected from all predefined palettes
+        const allPalettes = document.querySelectorAll('.palette-option');
+        allPalettes.forEach(palette => {
+            palette.classList.remove('selected');
+        });
+        
+        // Show success message
+        document.getElementById('palette-status').style.display = 'block';
+        document.getElementById('palette-status').innerText = 'Custom colors applied! Click Save Settings to save changes.';
+        
+        // Optional: Log selection to console
+        console.log(`Custom palette selected:`, { primaryColor, secondaryColor, tertiaryColor });
     }
     
     function showPremiumFeatureAlert() {

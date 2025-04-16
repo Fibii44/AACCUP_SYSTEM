@@ -9,16 +9,101 @@
     $primaryColor = $settings->primary_color ?? '#3490dc';
     $secondaryColor = $settings->secondary_color ?? '#6c757d';
     $tertiaryColor = $settings->tertiary_color ?? '#1a237e';
+    
+    // Create a slightly lighter version of primary for hover effects
+    $primaryColorLight = $primaryColor . '20'; // Adding 20% opacity
 @endphp
 
 <style>
-    
-    
+    /* Base color classes */
     .bg-gradient-primary {
-        background-image: linear-gradient(310deg, {{ $primaryColor }} 0%, {{ $secondaryColor }} 100%);
+        background: {{ $primaryColor }} !important;
+        background-image: none !important;
     }
     
- 
+    .bg-gradient-success {
+        background: #2dcb73 !important;
+        background-image: none !important;
+    }
+    
+    .bg-gradient-info {
+        background: #17c1e8 !important;
+        background-image: none !important;
+    }
+    
+    .bg-gradient-warning {
+        background: #f53939 !important;
+        background-image: none !important;
+    }
+    
+    .bg-gradient-danger {
+        background: #ea0606 !important;
+        background-image: none !important;
+    }
+    
+    .bg-gradient-secondary {
+        background: #8392ab !important;
+        background-image: none !important;
+    }
+    
+    /* Text colors */
+    .text-primary {
+        color: {{ $primaryColor }} !important;
+    }
+    
+    /* Card styling */
+    .card {
+        border-radius: 10px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        border: none;
+    }
+    
+    .card-header {
+        color: {{ $tertiaryColor }};
+        font-weight: 600;
+    }
+    
+    /* Button styling */
+    .btn {
+        font-weight: 500;
+        border-radius: 6px;
+    }
+    
+    .form-select, .form-control {
+        border-color: #eee;
+    }
+    
+    .form-select:focus, .form-control:focus {
+        border-color: {{ $primaryColor }};
+        box-shadow: 0 0 0 0.25rem rgba(255, 133, 169, 0.25);
+    }
+    
+    /* Table styling */
+    .table thead th {
+        font-weight: 600;
+        color: {{ $tertiaryColor }};
+    }
+    
+    /* Modal styling */
+    .modal-content {
+        border: none;
+        border-radius: 10px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+    
+    .modal-header {
+        border-bottom-color: #eee;
+    }
+    
+    .modal-footer {
+        border-top-color: #eee;
+    }
+    
+    /* Toast styling */
+    .toast {
+        border-radius: 10px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+    }
 </style>
 
 <div class="row">
@@ -26,7 +111,7 @@
         <!-- Status Filter -->
         <div class="mb-3 d-flex justify-content-end align-items-center">
             <form action="{{ route('tenant.user-table') }}" method="GET" class="d-flex align-items-center">
-                <label for="statusFilter" class="me-2 mb-0"  font-weight: 500;">Filter by status:</label>
+                <label for="statusFilter" class="me-2 mb-0" style="color: {{ $tertiaryColor }}; font-weight: 500;">Filter by status:</label>
                 <select name="status" id="statusFilter" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
                     <option value="all" {{ $statusFilter === 'all' ? 'selected' : '' }}>All Users</option>
                     <option value="active" {{ $statusFilter === 'active' ? 'selected' : '' }}>Active Users</option>
@@ -43,7 +128,7 @@
             <div class="card-header pb-0 d-flex justify-content-between align-items-center">
                 <h6>Users</h6>
                  <!-- Add Faculty Button -->
-                 <button type="button" class="btn bg-gradient-primary" data-bs-toggle="modal" data-bs-target="#addFacultyModal">
+                 <button type="button" class="btn bg-gradient-primary" data-bs-toggle="modal" data-bs-target="#addFacultyModal" style="background: {{ $primaryColor }};">
                     <i class="bi bi-person-plus me-2"></i>
                     <span class="btn-inner--text">Add Faculty</span>
                 </button>
@@ -53,11 +138,11 @@
                     <table class="table align-items-center mb-0">
                         <thead>
                             <tr>
-                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" ">Name</th>
-                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" ">Role</th>
-                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" ">Status</th>
-                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" ">Date Added</th>        
-                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" ">Actions</th>
+                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7" style="color: {{ $tertiaryColor }} !important;">Name</th>
+                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="color: {{ $tertiaryColor }} !important;">Role</th>
+                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="color: {{ $tertiaryColor }} !important;">Status</th>
+                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="color: {{ $tertiaryColor }} !important;">Date Added</th>        
+                                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2" style="color: {{ $tertiaryColor }} !important;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -115,7 +200,7 @@
                                 <tr>
                                     <td colspan="5" class="text-center py-4">
                                         <div class="d-flex flex-column align-items-center">
-                                            <i class="fas fa-users-slash text-secondary mb-2" style="font-size: 2rem;"></i>
+                                            <i class="fas fa-users-slash text-secondary mb-2" style="font-size: 2rem; color: {{ $primaryColor }} !important;"></i>
                                             <p class="mb-0">
                                                 @if(request('search'))
                                                     No users found matching "{{ request('search') }}" {{ $statusFilter !== 'all' ? 'with ' . $statusFilter . ' status' : '' }}.
@@ -149,23 +234,22 @@
                 @csrf
                 <div class="modal-body">
                     <div class="form-group mb-3">
-                        <label for="name" class="form-control-label">Name</label>
+                        <label for="name" class="form-control-label" style="color: {{ $tertiaryColor }}; font-weight: 500;">Name</label>
                         <input type="text" class="form-control" id="name" name="name" placeholder="Enter user name" required>
                     </div>
                     <div class="form-group">
-                        <label for="email" class="form-control-label">Email</label>
+                        <label for="email" class="form-control-label" style="color: {{ $tertiaryColor }}; font-weight: 500;">Email</label>
                         <input type="email" class="form-control" id="email" name="email" placeholder="Enter user email" required>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn bg-gradient-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn bg-gradient-primary">Add User</button>
+                    <button type="submit" class="btn bg-gradient-primary" style="background: {{ $primaryColor }};">Add User</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
-
 
 <!-- Edit User Modal -->
 <div class="modal fade" id="editFacultyModal" tabindex="-1" role="dialog" aria-labelledby="editFacultyModalLabel" aria-hidden="true">
@@ -182,17 +266,17 @@
                 @method('PATCH')
                 <div class="modal-body">
                     <div class="form-group mb-3">
-                        <label for="edit_name" class="form-control-label">Name</label>
+                        <label for="edit_name" class="form-control-label" style="color: {{ $tertiaryColor }}; font-weight: 500;">Name</label>
                         <input type="text" class="form-control" id="edit_name" name="name" required>
                     </div>
                     <div class="form-group">
-                        <label for="edit_email" class="form-control-label">Email</label>
+                        <label for="edit_email" class="form-control-label" style="color: {{ $tertiaryColor }}; font-weight: 500;">Email</label>
                         <input type="email" class="form-control" id="edit_email" name="email" required>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn bg-gradient-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn bg-gradient-primary">Save Changes</button>
+                    <button type="submit" class="btn bg-gradient-primary" style="background: {{ $primaryColor }};">Save Changes</button>
                 </div>
             </form>
         </div>
@@ -204,7 +288,7 @@
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="archiveFacultyModalLabel">Confirm Status Change</h5>
+                <h5 class="modal-title" id="archiveFacultyModalLabel" style="color: {{ $tertiaryColor }};">Confirm Status Change</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
@@ -213,17 +297,16 @@
                 @csrf
                 @method('PATCH')
                 <div class="modal-body">
-                    <p>Are you sure you want to <span id="archiveActionText" class="font-weight-bold"></span> this user: <span id="archiveUserName" class="font-weight-bold"></span>?</p>
+                    <p>Are you sure you want to <span id="archiveActionText" class="font-weight-bold" style="color: {{ $primaryColor }}"></span> this user: <span id="archiveUserName" class="font-weight-bold"></span>?</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn bg-gradient-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn bg-gradient-warning" id="archiveSubmitBtn">Archive User</button>
+                    <button type="submit" class="btn bg-gradient-warning" id="archiveSubmitBtn" style="background: {{ $primaryColor }};">Archive User</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
-
 
 <!-- Toast Messages -->
 @if(session('success') || session('error') || $errors->any())

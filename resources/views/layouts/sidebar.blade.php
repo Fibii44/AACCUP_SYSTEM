@@ -47,7 +47,7 @@
     
     /* Nav link text color */
     .navbar-vertical .nav-link-text {
-        color: #344767;
+        color: {{ $tertiaryColor }};
     }
     
     /* Active nav link text color */
@@ -66,7 +66,7 @@
     /* Icon backgrounds */
     .navbar-vertical .icon-shape {
         background: #fff !important;
-        border: 1px solid #e9ecef;
+        border: 1px solid {{ $primaryColor }};
         box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
     }
     
@@ -77,14 +77,14 @@
     
     /* Active icon styling */
     .navbar-vertical .nav-link.active .icon-shape {
-        background: {{ $secondaryColor }} !important;
+        background: {{ $primaryColor }} !important;
         border: 1px solid {{ $primaryColor }};
     }
     
     /* Fix SVG colors */
     .navbar-vertical .color-background, 
     .navbar-vertical .color-background.opacity-6 {
-        fill: {{ $secondaryColor }} !important;
+        fill: {{ $primaryColor }} !important;
     }
     
     /* Active icon styling - override SVG fills for active state */
