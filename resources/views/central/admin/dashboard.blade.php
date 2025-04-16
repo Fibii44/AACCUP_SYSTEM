@@ -107,6 +107,81 @@
                 </div>
             </div>
 
+            <!-- Pending Upgrade Requests Section -->
+            <div class="bg-white rounded-lg shadow-sm overflow-hidden mb-8">
+                <div class="px-6 py-5 border-b border-gray-200 flex justify-between items-center">
+                    <h3 class="text-lg font-semibold text-gray-500">Pending Subscription Upgrade Requests</h3>
+                    <span class="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
+                        {{ \App\Models\UpgradeRequest::where('status', 'pending')->count() }} Pending
+                    </span>
+                </div>
+                
+                @php
+                    $pendingUpgradeRequests = \App\Models\UpgradeRequest::where('status', 'pending')
+                        ->with('tenant')
+                        ->orderBy('requested_at', 'desc')
+                        ->limit(5)
+                        ->get();
+                @endphp
+                
+                @if($pendingUpgradeRequests->isEmpty())
+                    <div class="py-16 text-center">
+                        <p class="text-gray-500 text-lg">No pending upgrade requests</p>
+                    </div>
+                @else
+                    <div class="px-4 py-2">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Plan</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Requested</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    @foreach($pendingUpgradeRequests as $request)
+                                        <tr>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $request->tenant->department_name }}</td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $request->tenant->email }}</td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $request->tenant->isPremium() ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800' }}">
+                                                    {{ $request->tenant->isPremium() ? 'Premium' : 'Free' }}
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $request->requested_at->diffForHumans() }}</td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="flex space-x-2">
+                                                    <form action="{{ route('admin.upgrade-requests.approve', $request) }}" method="POST" class="inline">
+                                                        @csrf
+                                                        <button type="submit" class="px-4 py-2 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700">
+                                                            Approve
+                                                        </button>
+                                                    </form>
+                                                    
+                                                    <button type="button" onclick="showUpgradeRejectModal({{ $request->id }})" class="px-4 py-2 bg-red-600 text-white text-xs font-medium rounded hover:bg-red-700">
+                                                        Reject
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    @if(\App\Models\UpgradeRequest::where('status', 'pending')->count() > 5)
+                        <div class="px-6 py-4 border-t border-gray-200 text-center">
+                            <a href="{{ route('admin.upgrade-requests.index') }}" class="text-sm font-medium text-indigo-600 hover:text-indigo-500">
+                                View all pending upgrade requests
+                            </a>
+                        </div>
+                    @endif
+                @endif
+            </div>
+
             <!-- Recent Department Registration Requests -->
             <div class="bg-white rounded-lg shadow-sm overflow-hidden mb-8">
                 <div class="px-6 py-5 border-b border-gray-200">
@@ -153,7 +228,7 @@
                                                         </button>
                                                     </form>
                                                     
-                                                    <button type="button" onclick="showRejectModal({{ $request->id }})" class="px-4 py-2 bg-red-600 text-white text-xs font-medium rounded hover:bg-red-700">
+                                                    <button type="button" onclick="showTenantRejectModal({{ $request->id }})" class="px-4 py-2 bg-red-600 text-white text-xs font-medium rounded hover:bg-red-700">
                                                         Reject
                                                     </button>
                                                 </div>
@@ -176,12 +251,12 @@
         </div>
     </div>
     
-    <!-- Reject Modal -->
-    <div id="rejectModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
+    <!-- Tenant Reject Modal -->
+    <div id="tenantRejectModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
         <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Reject Department Request</h3>
             
-            <form id="rejectForm" action="" method="POST">
+            <form id="tenantRejectForm" action="" method="POST">
                 @csrf
                 <div class="mb-4">
                     <label for="rejection_reason" class="block text-sm font-medium text-gray-700 mb-1">
@@ -192,7 +267,34 @@
                 </div>
                 
                 <div class="flex justify-end space-x-3">
-                    <button type="button" onclick="hideRejectModal()" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 text-sm font-medium">
+                    <button type="button" onclick="hideTenantRejectModal()" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 text-sm font-medium">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700">
+                        Reject Request
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Upgrade Reject Modal -->
+    <div id="upgradeRejectModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Reject Upgrade Request</h3>
+            
+            <form id="upgradeRejectForm" action="" method="POST">
+                @csrf
+                <div class="mb-4">
+                    <label for="upgrade_rejection_reason" class="block text-sm font-medium text-gray-700 mb-1">
+                        Reason for Rejection
+                    </label>
+                    <textarea id="upgrade_rejection_reason" name="rejection_reason" rows="4" required
+                              class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
+                </div>
+                
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="hideUpgradeRejectModal()" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 text-sm font-medium">
                         Cancel
                     </button>
                     <button type="submit" class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700">
@@ -204,9 +306,9 @@
     </div>
     
     <script>
-        function showRejectModal(requestId) {
-            const modal = document.getElementById('rejectModal');
-            const form = document.getElementById('rejectForm');
+        function showTenantRejectModal(requestId) {
+            const modal = document.getElementById('tenantRejectModal');
+            const form = document.getElementById('tenantRejectForm');
             
             // Set the form action
             form.action = `/admin/tenant-requests/${requestId}/reject`;
@@ -215,8 +317,24 @@
             modal.classList.remove('hidden');
         }
         
-        function hideRejectModal() {
-            const modal = document.getElementById('rejectModal');
+        function hideTenantRejectModal() {
+            const modal = document.getElementById('tenantRejectModal');
+            modal.classList.add('hidden');
+        }
+        
+        function showUpgradeRejectModal(requestId) {
+            const modal = document.getElementById('upgradeRejectModal');
+            const form = document.getElementById('upgradeRejectForm');
+            
+            // Set the form action
+            form.action = `/admin/upgrade-requests/${requestId}/reject`;
+            
+            // Show the modal
+            modal.classList.remove('hidden');
+        }
+        
+        function hideUpgradeRejectModal() {
+            const modal = document.getElementById('upgradeRejectModal');
             modal.classList.add('hidden');
         }
     </script>

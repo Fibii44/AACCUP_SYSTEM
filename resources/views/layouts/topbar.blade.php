@@ -11,12 +11,13 @@
             User Table
           @elseif(request()->is('settings*'))
             Settings
+          @elseif(request()->is('subscription*'))
+            Subscription
           @else
             Dashboard
           @endif
         </li>
       </ol>
-     
     </nav>
     <div class="collapse navbar-collapse mt-sm-0 mt-2 me-md-0 me-sm-4" id="navbar">
       <div class="ms-md-auto pe-md-3 d-flex align-items-center">
@@ -29,6 +30,36 @@
         </form>
       </div>
       <ul class="navbar-nav justify-content-end align-items-center">
+        <!-- Subscription Button - Shows "Manage Plan" for premium and "Upgrade" for free -->
+        <li class="nav-item pe-3">
+          @php
+              try {
+                  // Get the current tenant from tenant() helper
+                  $tenant = tenant();
+                  $tenantId = $tenant->id;
+                  
+                  // Use the mysql connection to query the tenants table in the central database
+                  $tenantPlan = DB::connection('mysql')->table('tenants')->where('id', $tenantId)->value('plan');
+                  
+                  // Set flag based on plan value
+                  $isPremiumPlan = ($tenantPlan === 'premium');
+              } catch (\Exception $e) {
+                  // Default to free plan if there's an error
+                  $isPremiumPlan = false;
+                  
+                  // Log the error
+                  \Log::error('Error determining tenant plan: ' . $e->getMessage());
+              }
+          @endphp
+          
+          <a href="{{ route('tenant.subscription') }}" class="btn btn-sm {{ $isPremiumPlan ? 'btn-info' : 'btn-primary' }} mb-0">
+            @if($isPremiumPlan)
+              <i class="fas fa-cog me-1"></i> Manage Plan
+            @else
+              <i class="fas fa-crown me-1"></i> Upgrade
+            @endif
+          </a>
+        </li>
         <!-- Profile Dropdown -->
         <li class="nav-item dropdown pe-2 d-flex align-items-center">
           <a href="javascript:;" class="nav-link text-body p-0" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">

@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\TenantApprovalController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\TenantRequestController;
 use App\Http\Controllers\Admin\TenantController;
+use App\Http\Controllers\Admin\UpgradeRequestController;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
@@ -35,6 +36,11 @@ Route::domain(config('app.url'))->group(function () {
         Route::get('/tenant-requests/{tenantRequest}', [TenantApprovalController::class, 'show'])->name('admin.tenant-requests.show');
         Route::post('/tenant-requests/{tenantRequest}/approve', [TenantApprovalController::class, 'approve'])->name('admin.tenant-requests.approve');
         Route::post('/tenant-requests/{tenantRequest}/reject', [TenantApprovalController::class, 'reject'])->name('admin.tenant-requests.reject');
+        
+        // Upgrade request routes
+        Route::get('/upgrade-requests', [UpgradeRequestController::class, 'index'])->name('admin.upgrade-requests.index');
+        Route::post('/upgrade-requests/{upgradeRequest}/approve', [UpgradeRequestController::class, 'approve'])->name('admin.upgrade-requests.approve');
+        Route::post('/upgrade-requests/{upgradeRequest}/reject', [UpgradeRequestController::class, 'reject'])->name('admin.upgrade-requests.reject');
         
         // Admin settings routes
         Route::redirect('settings', 'settings/profile');

@@ -13,14 +13,19 @@ class TenantSettingsController extends Controller
         // Get the current settings from the database
         $settings = TenantSetting::first();
         
+        // Get the current tenant and determine if premium
+        $tenant = tenant();
+        $isPremium = $tenant->isPremium();
+        
         // Debug the current colors
         \Log::info('Current Settings:', [
             'primary_color' => $settings ? $settings->primary_color : 'No settings found',
             'secondary_color' => $settings ? $settings->secondary_color : 'No settings found',
-            'tertiary_color' => $settings ? $settings->tertiary_color : 'No settings found'
+            'tertiary_color' => $settings ? $settings->tertiary_color : 'No settings found',
+            'isPremium' => $isPremium
         ]);
         
-        return view('tenant.settings', compact('settings'));
+        return view('tenant.settings', compact('settings', 'isPremium'));
     }
 
     public function update(Request $request) 

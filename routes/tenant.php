@@ -6,6 +6,7 @@ use App\Http\Controllers\LandingPageController;
 use App\Http\Controllers\Tenant\TenantLoginController;
 use App\Http\Controllers\Tenant\TenantFacultyController;
 use App\Http\Controllers\Tenant\TenantSettingsController;
+use App\Http\Controllers\Tenant\SubscriptionController;
 use App\Http\Middleware\RoleMiddleware;
 use Illuminate\Support\Facades\Route;
 use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
@@ -75,6 +76,14 @@ Route::middleware([
                 ->name('tenant.settings');
             Route::patch('/settings', [TenantSettingsController::class, 'update'])
                 ->name('tenant.settings.update');
+                
+            // Subscription routes
+            Route::get('/subscription', [SubscriptionController::class, 'index'])
+                ->name('tenant.subscription');
+            Route::post('/subscription/upgrade', [SubscriptionController::class, 'upgrade'])
+                ->name('tenant.subscription.upgrade');
+            Route::post('/subscription/downgrade', [SubscriptionController::class, 'downgrade'])
+                ->name('tenant.subscription.downgrade');
         });
 
         // Faculty routes
