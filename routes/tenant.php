@@ -48,6 +48,10 @@ Route::middleware([
     Route::post('/login', [TenantLoginController::class, 'login'])->name('tenant.login');
     Route::post('/logout', [TenantLoginController::class, 'logout'])->name('tenant.logout');
     
+    // Google OAuth Routes
+    Route::get('/login/google', [TenantLoginController::class, 'redirectToGoogle'])->name('tenant.login.google');
+    Route::get('/login/google/callback', [TenantLoginController::class, 'handleGoogleCallback'])->name('tenant.login.google.callback');
+    
     // Authenticated tenant routes
     Route::middleware(['auth'])->group(function () {
         // Admin routes
