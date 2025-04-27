@@ -30,6 +30,7 @@ class User extends Authenticatable
         'google_token',
         'google_refresh_token',
         'google_token_expires_at',
+        'profile_picture',
     ];
 
     /**
@@ -64,5 +65,28 @@ class User extends Authenticatable
             ->explode(' ')
             ->map(fn (string $name) => Str::of($name)->substr(0, 1))
             ->implode('');
+    }
+
+    /**
+     * Get the user's avatar URL
+     * 
+     * @return string
+     */
+    public function getAvatarAttribute()
+    {
+        if (!empty($this->profile_picture)) {
+            return $this->profile_picture;
+        }
+        
+        // Generate a default avatar based on initials or use a placeholder
+        $initials = $this->initials();
+        $colors = ['#1abc9c', '#3498db', '#9b59b6', '#f1c40f', '#e67e22', '#e74c3c', '#bdc3c7'];
+        $colorIndex = ord($initials[0] ?? 'A') % count($colors);
+        $backgroundColor = $colors[$colorIndex];
+        
+        // Return a placeholder image or URL to a service like ui-avatars
+        return 'https://ui-avatars.com/api/?name=' . urlencode($initials) . 
+               '&background=' . str_replace('#', '', $backgroundColor) . 
+               '&color=ffffff&size=256';
     }
 }

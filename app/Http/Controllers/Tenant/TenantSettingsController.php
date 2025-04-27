@@ -39,6 +39,7 @@ class TenantSettingsController extends Controller
                 'palette' => $request->input('palette')
             ]);
             
+            
             // Validate the color inputs
             $request->validate([
                 'primary_color' => 'required|string|starts_with:#',

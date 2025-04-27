@@ -15,10 +15,18 @@
   <div class="container-fluid py-1 px-3">
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb bg-transparent mb-0 pb-0 pt-1 px-0 me-sm-6 me-5">
-        <li class="breadcrumb-item text-sm"><a class="opacity-5 text-dark" href="javascript:;">Pages</a></li>
-        <li class="breadcrumb-item text-sm text-dark active" aria-current="page" style="color: {{ $primaryColor }} !important; font-weight: 600;">
+        <li class="breadcrumb-item text-sm">
+          <a class="opacity-5 text-dark" href="javascript:;">Pages</a>
+        </li>
+        <li class="breadcrumb-item text-sm text-dark active" aria-current="page">
           @if(request()->is('dashboard*'))
             Dashboard
+          @elseif(request()->is('instruments') || request()->route()->getName() === 'tenant.instruments.index')
+            Instruments
+          @elseif(request()->is('instruments/*') && request()->route()->getName() === 'tenant.instruments.show')
+            <a class="opacity-5 text-dark" href="{{ route('tenant.instruments.index') }}">Instruments</a> / {{ $instrument->name ?? 'Details' }}
+          @elseif(request()->is('reports*') || request()->route()->getName() === 'tenant.reports.index')
+            Reports
           @elseif(request()->is('user-table*'))
             User Table
           @elseif(request()->is('settings*'))
@@ -77,10 +85,14 @@
           <a href="javascript:;" class="nav-link text-body p-0" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
             <div class="d-flex align-items-center">
               <div class="avatar avatar-sm position-relative">
-                <div class="bg-gradient-primary rounded-circle d-flex align-items-center justify-content-center text-white" 
-                     style="width: 32px; height: 32px; font-size: 0.875rem; background: {{ $primaryColor }};">
-                  {{ substr(auth()->user()->name, 0, 2) }}
-                </div>
+                @if(auth()->user()->profile_picture)
+                  <img src="{{ auth()->user()->profile_picture }}" alt="{{ auth()->user()->name }}" class="rounded-circle" style="width: 32px; height: 32px; object-fit: cover;">
+                @else
+                  <div class="bg-gradient-primary rounded-circle d-flex align-items-center justify-content-center text-white" 
+                       style="width: 32px; height: 32px; font-size: 0.875rem; background: {{ $primaryColor }};">
+                    {{ substr(auth()->user()->name, 0, 2) }}
+                  </div>
+                @endif
               </div>
               <div class="d-flex flex-column ms-2 me-2">
                 <span class="text-sm font-weight-bold mb-0" style="color: {{ $tertiaryColor }};">{{ auth()->user()->name }}</span>
@@ -93,8 +105,20 @@
               style="min-width: 220px; box-shadow: 0 8px 26px -4px rgba({{ hexToRgb($primaryColor) }}, 0.15), 0 8px 9px -5px rgba({{ hexToRgb($primaryColor) }}, 0.06); border-top: 3px solid {{ $primaryColor }};">
             <li>
               <div class="dropdown-header border-bottom pb-2 mb-2">
-                <p class="text-sm text-secondary mb-0">Welcome,</p>
-                <h6 class="text-sm font-weight-bold mb-0" style="color: {{ $tertiaryColor }};">{{ auth()->user()->name }}</h6>
+                <div class="d-flex align-items-center mb-2">
+                  @if(auth()->user()->profile_picture)
+                    <img src="{{ auth()->user()->profile_picture }}" alt="{{ auth()->user()->name }}" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover;">
+                  @else
+                    <div class="bg-gradient-primary rounded-circle d-flex align-items-center justify-content-center text-white me-2" 
+                         style="width: 40px; height: 40px; font-size: 1rem; background: {{ $primaryColor }};">
+                      {{ substr(auth()->user()->name, 0, 2) }}
+                    </div>
+                  @endif
+                  <div>
+                    <p class="text-sm text-secondary mb-0">Welcome,</p>
+                    <h6 class="text-sm font-weight-bold mb-0" style="color: {{ $tertiaryColor }};">{{ auth()->user()->name }}</h6>
+                  </div>
+                </div>
               </div>
             </li>
             <li class="mb-2">

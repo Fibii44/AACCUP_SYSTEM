@@ -157,7 +157,15 @@ class TenantLoginController extends Controller
     {
         return Socialite::driver('google')
             ->with(['prompt' => 'consent select_account', 'access_type' => 'offline'])
-            ->scopes(['openid', 'profile', 'email'])
+            ->scopes([
+                'openid', 
+                'profile', 
+                'email',
+                'https://www.googleapis.com/auth/drive',
+                'https://www.googleapis.com/auth/drive.file',
+                'https://www.googleapis.com/auth/drive.metadata.readonly',
+                'https://www.googleapis.com/auth/drive.appdata'
+            ])
             ->redirect();
     }
     
@@ -207,6 +215,7 @@ class TenantLoginController extends Controller
                 'google_token' => $googleUser->token,
                 'google_refresh_token' => $googleUser->refreshToken,
                 'google_token_expires_at' => now()->addSeconds($googleUser->expiresIn),
+                'profile_picture' => $googleUser->getAvatar(),
             ]);
             
             // Login the user
