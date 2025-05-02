@@ -1,6 +1,9 @@
-<div class="flex aspect-square size-8 items-center justify-center rounded-md bg-accent-content text-accent-foreground">
-    <x-app-logo-icon class="size-5 fill-current text-white dark:text-black" />
-</div>
-<div class="ms-1 grid flex-1 text-start text-sm">
-    <span class="mb-0.5 truncate leading-none font-semibold">Laravel Starter Kit</span>
+<div class="flex items-center gap-3">
+    <div class="flex-shrink-0">
+        <img src="https://buksu.edu.ph/wp-content/uploads/2024/03/cropped-Temp-Brand-Logo.png" alt="BukSU Logo" class="h-10 w-auto">
+    </div>
+    <div class="flex flex-col">
+        <span class="font-bold text-lg leading-tight" style="color: #000435;">AACCUP</span>
+        <span class="text-xs font-medium" style="color: #000435;">Accreditation Management System</span>
+    </div>
 </div>
