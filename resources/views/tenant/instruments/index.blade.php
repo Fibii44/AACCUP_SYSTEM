@@ -12,7 +12,48 @@
     
     // Create a slightly lighter version of primary for hover effects
     $primaryColorLight = $primaryColor . '20'; // Adding 20% opacity
+
+    // Check if user has Google token
+    $hasGoogleToken = auth()->user()->google_token !== null;
 @endphp
+
+<style>
+    /* Override Bootstrap's default button styles */
+    .btn-primary,
+    .btn.bg-gradient-primary,
+    .btn.bg-gradient-primary:not(:disabled):not(.disabled) {
+        background: {{ $primaryColor }} !important;
+        border-color: {{ $primaryColor }} !important;
+        color: #fff !important;
+    }
+
+    .btn-primary:hover,
+    .btn.bg-gradient-primary:hover:not(:disabled):not(.disabled) {
+        background: {{ $primaryColor }} !important;
+        border-color: {{ $primaryColor }} !important;
+        opacity: 0.9;
+    }
+
+    .btn.bg-gradient-primary:disabled,
+    .btn.bg-gradient-primary.disabled {
+        background: {{ $primaryColor }} !important;
+        border-color: {{ $primaryColor }} !important;
+        opacity: 0.65;
+    }
+
+    /* Style for warning alert */
+    .alert-warning {
+        background-color: {{ $secondaryColor }}15 !important;
+        border-color: {{ $secondaryColor }} !important;
+        color: {{ $tertiaryColor }} !important;
+    }
+
+    .btn-warning {
+        background-color: {{ $secondaryColor }} !important;
+        border-color: {{ $secondaryColor }} !important;
+        color: #fff !important;
+    }
+</style>
 
 <!-- Load Font Awesome -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
@@ -38,12 +79,29 @@
         <div class="col-12">
             <div class="card mb-4">
                 <div class="card-header pb-0">
-                    <div class="d-flex justify-content-end align-items-center">
-                        @if(auth()->user()->role === 'admin')
-                        <button type="button" class="btn bg-gradient-primary" data-bs-toggle="modal" data-bs-target="#createInstrumentModal" style="background-color: {{ $primaryColor }}; border-color: {{ $primaryColor }};">
-                            + Instrument
-                        </button>
-                        @endif
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            @if(auth()->user()->role === 'admin' && !$hasGoogleToken)
+                            <div class="alert alert-warning mb-0 d-flex align-items-center">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                Please connect your Google account first to create instruments.
+                                <a href="{{ route('tenant.settings.profile') }}" class="btn btn-sm btn-warning ms-3">
+                                    Connect Google Account
+                                </a>
+                            </div>
+                            @endif
+                        </div>
+                        <div>
+                            @if(auth()->user()->role === 'admin')
+                            <button type="button" 
+                                class="btn bg-gradient-primary {{ !$hasGoogleToken ? 'disabled' : '' }}" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="{{ $hasGoogleToken ? '#createInstrumentModal' : '' }}"
+                                {{ !$hasGoogleToken ? 'disabled' : '' }}>
+                                + Instrument
+                            </button>
+                            @endif
+                        </div>
                     </div>
                 </div>
                 <div class="card-body px-0 pt-0 pb-2">
@@ -114,7 +172,7 @@
                             <div class="text-danger">{{ $message }}</div>
                         @enderror
                     </div>
-                    <button type="submit" class="btn btn-primary" style="background-color: {{ $primaryColor }}; border-color: {{ $primaryColor }};">Create</button>
+                    <button type="submit" class="btn bg-gradient-primary">Create</button>
                 </form>
             </div>
         </div>
@@ -137,7 +195,7 @@
                         <label for="edit_name" class="form-label">Name</label>
                         <input type="text" class="form-control" id="edit_name" name="name" required>
                     </div>
-                    <button type="submit" class="btn btn-primary" style="background-color: {{ $primaryColor }}; border-color: {{ $primaryColor }};">Update</button>
+                    <button type="submit" class="btn bg-gradient-primary">Update</button>
                 </form>
             </div>
         </div>

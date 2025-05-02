@@ -48,7 +48,7 @@
                                     <h5 class="mb-0">Free Plan</h5>
                                     <p class="text-sm mb-0">Basic features for small departments</p>
                                     <div class="d-flex justify-content-center mt-3 mb-1">
-                                        <span class="h1 mb-0">$0</span>
+                                        <span class="h1 mb-0">₱0</span>
                                         <span class="text-sm align-self-end mb-1">/month</span>
                                     </div>
                                 </div>
@@ -104,7 +104,7 @@
                                     <h5 class="mb-0">Premium Plan</h5>
                                     <p class="text-sm mb-0">Advanced features for larger departments</p>
                                     <div class="d-flex justify-content-center mt-3 mb-1">
-                                        <span class="h1 mb-0">$49</span>
+                                        <span class="h1 mb-0">₱250</span>
                                         <span class="text-sm align-self-end mb-1">/month</span>
                                     </div>
                                 </div>

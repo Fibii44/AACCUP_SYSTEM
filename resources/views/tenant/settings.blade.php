@@ -194,22 +194,19 @@
                                                         <label for="custom_primary_color" class="form-control-label">Primary Color</label>
                                                         <input type="color" class="form-control form-control-color w-100" 
                                                                id="custom_primary_color" 
-                                                               value="{{ $settings->primary_color ?? '#3490dc' }}"
-                                                               onchange="updateCustomPalette()">
+                                                               value="{{ $settings->primary_color ?? '#3490dc' }}">
                                                     </div>
                                                     <div class="col-md-4 mb-3">
                                                         <label for="custom_secondary_color" class="form-control-label">Secondary Color</label>
                                                         <input type="color" class="form-control form-control-color w-100" 
                                                                id="custom_secondary_color" 
-                                                               value="{{ $settings->secondary_color ?? '#6c757d' }}"
-                                                               onchange="updateCustomPalette()">
+                                                               value="{{ $settings->secondary_color ?? '#6c757d' }}">
                                                     </div>
                                                     <div class="col-md-4 mb-3">
                                                         <label for="custom_tertiary_color" class="form-control-label">Tertiary Color</label>
                                                         <input type="color" class="form-control form-control-color w-100" 
                                                                id="custom_tertiary_color" 
-                                                               value="{{ $settings->tertiary_color ?? '#1a237e' }}"
-                                                               onchange="updateCustomPalette()">
+                                                               value="{{ $settings->tertiary_color ?? '#1a237e' }}">
                                                     </div>
                                                 </div>
                                                 
@@ -220,10 +217,6 @@
                                                             <div id="custom_secondary_preview" style="background-color: {{ $settings->secondary_color ?? '#6c757d' }}; flex: 1;"></div>
                                                             <div id="custom_tertiary_preview" style="background-color: {{ $settings->tertiary_color ?? '#1a237e' }}; flex: 1;"></div>
                                                         </div>
-                                                        <button type="button" class="btn btn-sm btn-outline-primary" 
-                                                                onclick="selectCustomPalette()">
-                                                            Apply Custom Colors
-                                                        </button>
                                                     </div>
                                                 </div>
                                             @else
@@ -254,7 +247,7 @@
                                     </div>
                                     
                                     <div id="palette-status" class="text-sm text-success mt-2" style="display: none;">
-                                        Palette selected! Click Save Settings to apply changes.
+                                        Colors updated! Click Save Settings to apply changes.
                                     </div>
                                     
                                     <!-- Hidden color inputs for form submission -->
@@ -428,8 +421,8 @@
         // Show success message
         document.getElementById('palette-status').style.display = 'block';
         
-        // Optional: Log selection to console
-        console.log(`Palette selected: ${paletteId}`, { primary, secondary, tertiary });
+        // Update custom color preview
+        updateCustomPalettePreview(primary, secondary, tertiary);
     }
     
     function updateCustomPalette() {
@@ -437,16 +430,7 @@
         const secondaryColor = document.getElementById('custom_secondary_color').value;
         const tertiaryColor = document.getElementById('custom_tertiary_color').value;
         
-        // Update preview divs
-        document.getElementById('custom_primary_preview').style.backgroundColor = primaryColor;
-        document.getElementById('custom_secondary_preview').style.backgroundColor = secondaryColor;
-        document.getElementById('custom_tertiary_preview').style.backgroundColor = tertiaryColor;
-    }
-    
-    function selectCustomPalette() {
-        const primaryColor = document.getElementById('custom_primary_color').value;
-        const secondaryColor = document.getElementById('custom_secondary_color').value;
-        const tertiaryColor = document.getElementById('custom_tertiary_color').value;
+        updateCustomPalettePreview(primaryColor, secondaryColor, tertiaryColor);
         
         // Update hidden inputs
         document.getElementById('primary_color').value = primaryColor;
@@ -454,19 +438,27 @@
         document.getElementById('tertiary_color').value = tertiaryColor;
         document.getElementById('palette').value = 'custom';
         
-        // Update UI - remove selected from all predefined palettes
-        const allPalettes = document.querySelectorAll('.palette-option');
-        allPalettes.forEach(palette => {
-            palette.classList.remove('selected');
-        });
-        
         // Show success message
         document.getElementById('palette-status').style.display = 'block';
-        document.getElementById('palette-status').innerText = 'Custom colors applied! Click Save Settings to save changes.';
-        
-        // Optional: Log selection to console
-        console.log(`Custom palette selected:`, { primaryColor, secondaryColor, tertiaryColor });
     }
+    
+    function updateCustomPalettePreview(primary, secondary, tertiary) {
+        document.getElementById('custom_primary_preview').style.backgroundColor = primary;
+        document.getElementById('custom_secondary_preview').style.backgroundColor = secondary;
+        document.getElementById('custom_tertiary_preview').style.backgroundColor = tertiary;
+    }
+    
+    // Add event listeners for color inputs
+    document.addEventListener('DOMContentLoaded', function() {
+        const colorInputs = ['custom_primary_color', 'custom_secondary_color', 'custom_tertiary_color'];
+        colorInputs.forEach(inputId => {
+            const input = document.getElementById(inputId);
+            if (input) {
+                input.addEventListener('change', updateCustomPalette);
+                input.addEventListener('input', updateCustomPalette);
+            }
+        });
+    });
     
     function showPremiumFeatureAlert() {
         // Show the bootstrap modal
