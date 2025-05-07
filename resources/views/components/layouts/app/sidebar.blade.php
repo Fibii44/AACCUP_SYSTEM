@@ -41,7 +41,7 @@
             }
         </style>
     </head>
-    <body class="min-h-screen bg-gray-100">
+    <body class="min-h-screen bg-primary">
         <flux:sidebar sticky stashable class="sidebar-buksu">
             <flux:sidebar.toggle class="lg:hidden text-buksu-white hover-buksu-gold" icon="x-mark" />
 
@@ -141,7 +141,7 @@
         </flux:sidebar>
 
         <!-- Mobile User Menu -->
-        <flux:header class="lg:hidden sidebar-buksu">
+        <flux:header class="lg:hidden sidebar-buksu" style="background-color: #000435;">
             <flux:sidebar.toggle class="lg:hidden text-buksu-white hover-buksu-gold" icon="bars-2" inset="left" />
 
             <flux:spacer />

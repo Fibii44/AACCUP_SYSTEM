@@ -74,7 +74,55 @@ new #[Layout('components.layouts.auth')] class extends Component {
 }; ?>
 
 <div class="flex flex-col gap-6">
-    <x-auth-header :title="__('Log in to your account')" :description="__('Enter your email and password below to log in')" class="text-primary" />
+    <style>
+        /* Make text darker throughout the form */
+        .dark input, 
+        .dark label, 
+        .dark .text-zinc-600, 
+        .dark .text-zinc-400 {
+            color: #FFFFFF !important;
+        }
+        
+        /* Make placeholders more visible */
+        .dark input::placeholder {
+            color: rgba(255, 255, 255, 0.7) !important;
+        }
+        
+        /* Ensure links are visible */
+        .dark a {
+            color: var(--highlight, #FFC100) !important;
+        }
+        
+        /* Make checkbox text visible */
+        .dark [data-flux-checkbox-label] {
+            color: #FFFFFF !important;
+        }
+        
+        /* Fix the login card background */
+        .dark [data-auth-card],
+        .dark .bg-white,
+        .dark [role="dialog"],
+        .dark [data-flux-dialog-panel] {
+            background-color: #000435 !important;
+            border-color: var(--highlight, #FFC100) !important;
+            border-width: 1px !important;
+        }
+        
+        /* Fix for inputs in dark mode */
+        .dark [data-flux-input],
+        .dark [data-flux-control] {
+            background-color: rgba(255, 255, 255, 0.1) !important;
+            border-color: rgba(255, 255, 255, 0.2) !important;
+        }
+        
+        /* Make auth header text light */
+        h1[data-flux-heading], 
+        p[data-flux-text] {
+            color: white !important;
+        }
+    </style>
+    
+    <!-- <x-auth-header :title="__('Log in to your account')" :description="__('Enter your email and password below to log in')" style="color: white;" /> -->
 
     <!-- Session Status -->
     <x-auth-session-status class="text-center" :status="session('status')" />
@@ -118,7 +166,7 @@ new #[Layout('components.layouts.auth')] class extends Component {
     </form>
 
     @if (Route::has('register'))
-        <div class="space-x-1 rtl:space-x-reverse text-center text-sm text-zinc-600 dark:text-zinc-400">
+        <div class="space-x-1 rtl:space-x-reverse text-center text-sm text-zinc-600 dark:text-white">
             {{ __('Don\'t have an account?') }}
             <flux:link :href="route('register')" wire:navigate>{{ __('Sign up') }}</flux:link>
         </div>

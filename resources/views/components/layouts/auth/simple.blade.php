@@ -51,6 +51,31 @@
                 padding: 2rem;
                 box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
             }
+            
+            /* Dark mode styles */
+            .dark flux-input label,
+            .dark flux-input input,
+            .dark flux-checkbox label,
+            .dark flux-heading,
+            .dark flux-subheading {
+                color: white !important;
+            }
+            
+            .dark .auth-card {
+                background-color: #000435 !important;
+                border: 1px solid var(--highlight);
+            }
+            
+            .dark flux-input input,
+            .dark flux-input div,
+            .dark [data-flux-control] {
+                background-color: rgba(255, 255, 255, 0.1) !important;
+                border-color: rgba(255, 255, 255, 0.2) !important;
+            }
+            
+            .dark flux-input input::placeholder {
+                color: rgba(255, 255, 255, 0.6) !important;
+            }
         </style>
     </head>
     <body class="min-h-screen antialiased">
