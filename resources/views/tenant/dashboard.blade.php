@@ -33,7 +33,9 @@
     }
 
     // Get counts
-    $totalUsers = \App\Models\User::where('status', 'active')->count();
+    $totalUsers = \App\Models\User::where('status', 'active')
+                    ->where('role', '!=', 'admin')
+                    ->count();
     $totalInstruments = \App\Models\Instrument::count();
     $totalAreas = \App\Models\Area::count();
     $totalParameters = \App\Models\Parameter::count();
@@ -69,15 +71,7 @@
         font-weight: 700;
     }
 
-    .icon-shape {
-        width: 48px;
-        height: 48px;
-        background: {{ $primaryColor }};
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
+    
     .bg-gradient-primary {
         background: {{ $primaryColor }};
     }
@@ -104,20 +98,7 @@
         background-color: {{ $primaryColor }};
     }
 
-    /* Custom colors for different cards */
     
-
-    .card:nth-child(2) .icon-shape {
-        background: {{ $secondaryColor }};
-    }
-
-    .card:nth-child(3) .icon-shape {
-        background: {{ $tertiaryColor }};
-    }
-
-    .card:nth-child(4) .icon-shape {
-        background: {{ $primaryColor }};
-    }
 
     /* Mask colors */
     .mask.bg-primary {
@@ -158,7 +139,7 @@
                     </div>
                     <div class="col-4 text-end">
                         <div class="icon icon-shape bg-gradient-primary shadow text-center border-radius-md">
-                            <i class="ni ni-circle-08 text-lg opacity-10" aria-hidden="true"></i>
+                            <i class="fas fa-users text-lg text-white" aria-hidden="true"></i>
                         </div>
                     </div>
                 </div>
@@ -180,7 +161,7 @@
                     </div>
                     <div class="col-4 text-end">
                         <div class="icon icon-shape bg-gradient-primary shadow text-center border-radius-md">
-                            <i class="ni ni-collection text-lg opacity-10" aria-hidden="true"></i>
+                            <i class="fas fa-tools text-lg text-white" aria-hidden="true"></i>
                         </div>
                     </div>
                 </div>
@@ -202,7 +183,7 @@
                     </div>
                     <div class="col-4 text-end">
                         <div class="icon icon-shape bg-gradient-primary shadow text-center border-radius-md">
-                            <i class="ni ni-app text-lg opacity-10" aria-hidden="true"></i>
+                            <i class="fas fa-map-marker-alt text-lg text-white" aria-hidden="true"></i>
                         </div>
                     </div>
                 </div>
@@ -224,7 +205,7 @@
                     </div>
                     <div class="col-4 text-end">
                         <div class="icon icon-shape bg-gradient-primary shadow text-center border-radius-md">
-                            <i class="ni ni-chart-bar-32 text-lg opacity-10" aria-hidden="true"></i>
+                            <i class="fas fa-chart-line text-lg text-white" aria-hidden="true"></i>
                         </div>
                     </div>
                 </div>

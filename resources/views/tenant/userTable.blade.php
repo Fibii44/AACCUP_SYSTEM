@@ -151,6 +151,16 @@
                                 <tr>
                                     <td>
                                         <div class="d-flex px-2 py-1">
+                                            <div class="avatar avatar-sm position-relative me-2">
+                                                @if($member->profile_picture)
+                                                    <img src="{{ $member->profile_picture }}" alt="{{ $member->name }}" class="rounded-circle" style="width: 32px; height: 32px; object-fit: cover;">
+                                                @else
+                                                    <div class="bg-gradient-primary rounded-circle d-flex align-items-center justify-content-center text-white" 
+                                                         style="width: 32px; height: 32px; font-size: 0.875rem; background: {{ $primaryColor }};">
+                                                        {{ substr($member->name, 0, 2) }}
+                                                    </div>
+                                                @endif
+                                            </div>
                                             <div class="d-flex flex-column justify-content-center">
                                                 <h6 class="mb-0 text-sm">{{ $member->name }}</h6>
                                                 <p class="text-xs text-secondary mb-0">{{ $member->email }}</p>

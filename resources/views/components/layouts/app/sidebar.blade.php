@@ -15,10 +15,6 @@
                 border-right: 1px solid rgba(255, 193, 0, 0.2);
             }
             
-            .text-buksu-white {
-                color: var(--text-light);
-            }
-            
             .text-buksu-gold {
                 color: var(--highlight);
             }
@@ -45,7 +41,7 @@
             }
         </style>
     </head>
-    <body class="min-h-screen bg-white">
+    <body class="min-h-screen bg-gray-100">
         <flux:sidebar sticky stashable class="sidebar-buksu">
             <flux:sidebar.toggle class="lg:hidden text-buksu-white hover-buksu-gold" icon="x-mark" />
 
@@ -117,8 +113,8 @@
                                 </span>
 
                                 <div class="grid flex-1 text-start text-sm leading-tight">
-                                    <span class="truncate font-semibold text-buksu-navy">{{ auth()->user()->name }}</span>
-                                    <span class="truncate text-xs text-buksu-navy">{{ auth()->user()->email }}</span>
+                                    <span class="truncate font-semibold text-buksu-white">{{ auth()->user()->name }}</span>
+                                    <span class="truncate text-xs text-buksu-white">{{ auth()->user()->email }}</span>
                                 </div>
                             </div>
                         </div>
@@ -127,7 +123,7 @@
                     <flux:menu.separator />
 
                     <flux:menu.radio.group>
-                        <flux:menu.item :href="route('settings.profile')" icon="cog" wire:navigate class="text-buksu-navy hover:text-buksu-gold">
+                        <flux:menu.item :href="route('settings.profile')" icon="cog" wire:navigate class="text-buksu-white hover:text-buksu-gold">
                             {{ __('Settings') }}
                         </flux:menu.item>
                     </flux:menu.radio.group>
@@ -136,7 +132,7 @@
 
                     <form method="POST" action="{{ route('logout') }}" class="w-full">
                         @csrf
-                        <flux:menu.item as="button" type="submit" icon="arrow-right-start-on-rectangle" class="w-full text-buksu-navy hover:text-buksu-gold">
+                        <flux:menu.item as="button" type="submit" icon="arrow-right-start-on-rectangle" class="w-full text-buksu-white hover:text-buksu-gold">
                             {{ __('Log Out') }}
                         </flux:menu.item>
                     </form>
@@ -170,8 +166,8 @@
                                 </span>
 
                                 <div class="grid flex-1 text-start text-sm leading-tight">
-                                    <span class="truncate font-semibold text-buksu-navy">{{ auth()->user()->name }}</span>
-                                    <span class="truncate text-xs text-buksu-navy">{{ auth()->user()->email }}</span>
+                                    <span class="truncate font-semibold text-buksu-white">{{ auth()->user()->name }}</span>
+                                    <span class="truncate text-xs text-buksu-white">{{ auth()->user()->email }}</span>
                                 </div>
                             </div>
                         </div>
@@ -180,7 +176,7 @@
                     <flux:menu.separator />
 
                     <flux:menu.radio.group>
-                        <flux:menu.item :href="route('settings.profile')" icon="cog" wire:navigate class="text-buksu-navy hover:text-buksu-gold">
+                        <flux:menu.item :href="route('settings.profile')" icon="cog" wire:navigate class="text-buksu-white hover:text-buksu-gold">
                             {{ __('Settings') }}
                         </flux:menu.item>
                     </flux:menu.radio.group>
@@ -189,7 +185,7 @@
 
                     <form method="POST" action="{{ route('logout') }}" class="w-full">
                         @csrf
-                        <flux:menu.item as="button" type="submit" icon="arrow-right-start-on-rectangle" class="w-full text-buksu-navy hover:text-buksu-gold">
+                        <flux:menu.item as="button" type="submit" icon="arrow-right-start-on-rectangle" class="w-full text-buksu-white hover:text-buksu-gold">
                             {{ __('Log Out') }}
                         </flux:menu.item>
                     </form>

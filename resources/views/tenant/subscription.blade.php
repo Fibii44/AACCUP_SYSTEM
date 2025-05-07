@@ -1,6 +1,79 @@
 @extends('layouts.dashboardTemplate')
 
 @section('content')
+@php
+    // Get the tenant settings
+    $settings = \App\Models\TenantSetting::first() ?? new \App\Models\TenantSetting();
+    
+    // Get the colors with default fallbacks
+    $primaryColor = $settings->primary_color ?? '#3490dc';
+    $secondaryColor = $settings->secondary_color ?? '#6c757d';
+    $tertiaryColor = $settings->tertiary_color ?? '#1a237e';
+    
+    // Create a slightly lighter version of primary for hover effects
+    $primaryColorLight = $primaryColor . '20'; // Adding 20% opacity
+
+    // Helper function to adjust color brightness
+    function adjustBrightness($hex, $steps) {
+        // Remove hash if present
+        $hex = ltrim($hex, '#');
+        
+        // Convert to RGB
+        $r = hexdec(substr($hex, 0, 2));
+        $g = hexdec(substr($hex, 2, 2));
+        $b = hexdec(substr($hex, 4, 2));
+        
+        // Adjust brightness
+        $r = max(0, min(255, $r + $steps));
+        $g = max(0, min(255, $g + $steps));
+        $b = max(0, min(255, $b + $steps));
+        
+        // Convert back to hex
+        return sprintf("#%02x%02x%02x", $r, $g, $b);
+    }
+@endphp
+
+<style>
+    .btn-primary {
+        background-color: {{ $primaryColor }} !important;
+        border-color: {{ $primaryColor }} !important;
+    }
+    
+    .btn-outline-primary {
+        color: {{ $primaryColor }} !important;
+        border-color: {{ $primaryColor }} !important;
+    }
+    
+    .btn-outline-primary:hover {
+        background-color: {{ $primaryColor }} !important;
+        color: white !important;
+    }
+    
+    .badge.bg-primary {
+        background-color: {{ $primaryColor }} !important;
+    }
+    
+    .border-primary {
+        border-color: {{ $primaryColor }} !important;
+    }
+    
+    .text-primary {
+        color: {{ $primaryColor }} !important;
+    }
+    
+    .card-header h5 {
+        color: {{ $tertiaryColor }};
+    }
+    
+    .table thead th {
+        color: {{ $tertiaryColor }};
+    }
+    
+    .text-success {
+        color: {{ $secondaryColor }} !important;
+    }
+</style>
+
 <div class="container-fluid py-4">
     <div class="row mb-4">
         <div class="col-12">

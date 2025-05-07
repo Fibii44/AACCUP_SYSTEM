@@ -19,6 +19,7 @@ use App\Http\Middleware\CheckTenantDomainStatus;
 use App\Http\Middleware\CheckUserStatus;
 use App\Http\Controllers\Tenant\InstrumentController;
 use App\Http\Controllers\Tenant\UploadController;
+use App\Http\Controllers\Tenant\ProfileController;
 
 
 
@@ -56,6 +57,11 @@ Route::middleware([
     
     // Authenticated tenant routes
     Route::middleware(['auth'])->group(function () {
+        // Profile routes
+        Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
+        Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+        Route::patch('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
+
         // Admin routes
         Route::middleware([RoleMiddleware::class . ':admin'])->group(function () {
             // Admin Dashboard

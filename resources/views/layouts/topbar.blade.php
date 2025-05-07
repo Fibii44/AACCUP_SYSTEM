@@ -122,9 +122,9 @@
               </div>
             </li>
             <li class="mb-2">
-              <a class="dropdown-item border-radius-md py-2 d-flex align-items-center" href="{{ route('settings.profile') }}">
-                <i class="fas fa-cog text-primary me-2" style="font-size: 1rem; color: {{ $primaryColor }} !important;"></i>
-                <span class="text-sm font-weight-normal">Settings</span>
+              <a class="dropdown-item border-radius-md py-2 d-flex align-items-center" href="{{ route('profile.index') }}">
+                <i class="fas fa-user text-primary me-2" style="font-size: 1rem; color: {{ $primaryColor }} !important;"></i>
+                <span class="text-sm font-weight-normal">Profile</span>
               </a>
             </li>
             <li>
