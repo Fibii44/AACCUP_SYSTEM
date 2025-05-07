@@ -411,7 +411,7 @@
                     </a>
                 </div>
             @else
-                <h1 class="display-4 fw-bold" style="color: {{ $settings->tertiary_color }}">{{ $settings->header_text }}</h1>
+                <h1 class="display-4 fw-bold" style="color: white">{{ $settings->header_text }}</h1>
                 @if($settings->welcome_message)
                     <p class="lead mx-auto">{{ $settings->welcome_message }}</p>
                 @endif
