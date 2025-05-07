@@ -94,12 +94,12 @@
                                         </div>
                                         <div class="d-flex align-items-center">
                                             <span class="badge bg-success me-3">{{ $parameter->indicators->count() }} Indicators</span>
+                                            @if(auth()->user()->role === 'admin')
                                             <div class="dropdown">
                                                 <button class="btn btn-outline-secondary btn-sm px-2 py-1 rounded" id="dropdownMenuButton-{{ $parameter->id }}" data-bs-toggle="dropdown" aria-expanded="false" onclick="event.stopPropagation()">
                                                     <i class="fas fa-ellipsis-h fa-lg"></i>
                                                 </button>
                                                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButton-{{ $parameter->id }}">
-                                                    @if(auth()->user()->role === 'admin')
                                                     <li>
                                                         <a class="dropdown-item edit-parameter" href="#" data-id="{{ $parameter->id }}" data-name="{{ $parameter->name }}" onclick="editParameter({{ $parameter->id }}, '{{ $parameter->name }}'); return false;">
                                                             <i class="fas fa-edit me-2"></i>Edit
@@ -110,9 +110,9 @@
                                                             <i class="fas fa-trash me-2"></i>Delete
                                                         </a>
                                                     </li>
-                                                    @endif
                                                 </ul>
                                             </div>
+                                            @endif
                                         </div>
                                     </div>
                                     

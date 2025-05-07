@@ -118,6 +118,7 @@
                                             <h5 class="mb-0">{{ $instrument->name }}</h5>
                                         </a>
                                     </div>
+                                    @if(auth()->user()->role === 'admin')
                                     <div class="dropdown">
                                         <button class="btn btn-outline-secondary btn-sm px-2 py-1 rounded" id="dropdownMenuButton-{{ $instrument->id }}" data-bs-toggle="dropdown" aria-expanded="false">
                                             <i class="fas fa-ellipsis-h fa-lg"></i>
@@ -128,7 +129,6 @@
                                                     <i class="fas fa-eye me-2"></i>View Details
                                                 </a>
                                             </li>
-                                            @if(auth()->user()->role === 'admin')
                                             <li>
                                                 <a class="dropdown-item edit-instrument" href="#" data-id="{{ $instrument->id }}" data-name="{{ $instrument->name }}" onclick="editInstrument({{ $instrument->id }}, '{{ $instrument->name }}'); return false;">
                                                     <i class="fas fa-edit me-2"></i>Edit
@@ -139,9 +139,9 @@
                                                     <i class="fas fa-trash me-2"></i>Delete
                                                 </a>
                                             </li>
-                                            @endif
                                         </ul>
                                     </div>
+                                    @endif
                                 </div>
                             </div>
                         </div>

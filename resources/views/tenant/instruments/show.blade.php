@@ -82,12 +82,13 @@
                                             <a href="{{ route('tenant.instruments.area.show', [$instrument->id, $area->id]) }}" class="btn btn-sm btn-primary me-2" style="background-color: {{ $primaryColor }}; border-color: {{ $primaryColor }};">
                                                 <i class="fas fa-eye"></i> View Details
                                             </a>
+                                            @if(auth()->user()->role === 'admin')
                                             <div class="dropdown">
                                                 <button class="btn btn-outline-secondary btn-sm px-2 py-1 rounded" id="dropdownMenuButton-{{ $area->id }}" data-bs-toggle="dropdown" aria-expanded="false">
                                                     <i class="fas fa-ellipsis-h fa-lg"></i>
                                                 </button>
                                                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButton-{{ $area->id }}">
-                                                    @if(auth()->user()->role === 'admin')
+                                                    
                                                     <li>
                                                         <a class="dropdown-item edit-area" href="#" onclick="editArea({{ $area->id }}, '{{ $area->name }}'); return false;">
                                                             <i class="fas fa-edit me-2"></i>Edit
@@ -98,9 +99,9 @@
                                                             <i class="fas fa-trash me-2"></i>Delete
                                                         </a>
                                                     </li>
-                                                    @endif
                                                 </ul>
                                             </div>
+                                            @endif
                                         </div>
                                     </div>
                                 </div>

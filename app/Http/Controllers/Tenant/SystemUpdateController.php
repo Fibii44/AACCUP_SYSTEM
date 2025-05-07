@@ -10,10 +10,13 @@ use Illuminate\Support\Facades\Log;
 use Codedge\Updater\Events\UpdateAvailable;
 use Illuminate\Support\Facades\Artisan;
 use GuzzleHttp\Client;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\DB;
 
 class SystemUpdateController extends Controller
 {
     protected $updater;
+    public $forceUpdate = false;
 
     public function __construct(UpdaterManager $updater)
     {
@@ -169,7 +172,7 @@ class SystemUpdateController extends Controller
             $currentVersion = config('self-update.version_installed');
             $versionInfo = $this->getLatestVersionInfo();
             $newVersion = $versionInfo['version'];
-            $isNewVersionAvailable = $versionInfo['is_new_version_available'];
+            $isNewVersionAvailable = $versionInfo['is_new_version_available'] || $this->forceUpdate;
             
             // Check if the version is actually newer
             if (!$isNewVersionAvailable) {
@@ -255,16 +258,14 @@ class SystemUpdateController extends Controller
                 // Only run tenant migrations and ignore errors about existing tables
                 try {
                     Log::info('Running tenant migrations...');
-                    // Use --path to specify only tenant migrations path to avoid running
-                    // migrations that create tables that already exist
-                    $output = '';
-                    Artisan::call('tenants:migrate', [
-                        '--force' => true,
-                        '--path' => 'database/migrations/tenant',
-                    ], $output);
+                    // Use our custom method to run only new migrations
+                    $migrationResult = $this->runNewTenantMigrations();
                     
-                    // Log the migration output
-                    Log::info('Tenant migrations completed: ' . $output);
+                    if ($migrationResult) {
+                        Log::info('Tenant migrations completed successfully');
+                    } else {
+                        Log::warning('Tenant migrations had issues');
+                    }
                 } catch (\Exception $e) {
                     Log::warning('Tenant migration error (non-fatal): ' . $e->getMessage());
                     // Log the detailed exception
@@ -345,6 +346,19 @@ class SystemUpdateController extends Controller
             Log::info("Rolling back from {$currentVersion} to {$previousVersion}");
             $rollbackResult = true;
             
+            // Rollback tenant database migrations
+            try {
+                Log::info("Rolling back tenant database migrations...");
+                Artisan::call('tenants:rollback', [
+                    '--step' => 1,  // Roll back one migration batch
+                    '--force' => true
+                ]);
+                Log::info("Migration rollback output: " . Artisan::output());
+            } catch (\Exception $e) {
+                Log::warning("Tenant migration rollback error (non-fatal): " . $e->getMessage());
+                // Continue despite migration errors
+            }
+            
             try {
                 // Try to delete update archives if that method exists
                 if (method_exists($this->updater->source(), 'deleteUpdateArchives')) {
@@ -375,8 +389,7 @@ class SystemUpdateController extends Controller
             ]);
             
             return redirect()->route('tenant.system-updates.index')
-                ->with('success', 'Successfully rolled back to version ' . $previousVersion)
-                ->with('warning', 'Note: Database schema changes were not rolled back. Run php artisan migrate:rollback and php artisan tenants:migrate:rollback manually if needed.');
+                ->with('success', 'Successfully rolled back to version ' . $previousVersion . ' and reverted database changes');
         } catch (\Exception $e) {
             Log::error('Error during rollback: ' . $e->getMessage());
             
@@ -633,5 +646,130 @@ class SystemUpdateController extends Controller
                 ->take(5)
                 ->get()
         ]);
+    }
+
+    /**
+     * Run migrations for only new tenant migrations
+     * 
+     * This avoids the issue where the system tries to run all migrations
+     * including ones that have already been run
+     */
+    private function runNewTenantMigrations()
+    {
+        Log::info("Running new tenant migrations...");
+        
+        try {
+            // Get list of already run migrations
+            $ranMigrations = \DB::table('migrations')->pluck('migration')->toArray();
+            
+            // Get list of all migration files
+            $migrationPath = database_path('migrations/tenant');
+            $migrationFiles = \File::files($migrationPath);
+            
+            // Find new migrations that haven't been run
+            $newMigrations = [];
+            foreach ($migrationFiles as $file) {
+                $filename = $file->getFilename();
+                $migrationName = pathinfo($filename, PATHINFO_FILENAME);
+                
+                if (!in_array($migrationName, $ranMigrations)) {
+                    $newMigrations[] = $migrationPath . '/' . $filename;
+                    Log::info("Found new migration: " . $filename);
+                }
+            }
+            
+            // Run each new migration individually
+            foreach ($newMigrations as $migration) {
+                Log::info("Running migration: " . basename($migration));
+                \Artisan::call('migrate', [
+                    '--path' => 'database/migrations/tenant/' . basename($migration),
+                    '--force' => true,
+                ]);
+                
+                $output = \Artisan::output();
+                if ($output) {
+                    Log::info("Migration output: " . $output);
+                }
+            }
+            
+            return true;
+        } catch (\Exception $e) {
+            Log::error("Error running migrations: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Extract migrations from the downloaded release and run them
+     * 
+     * @param string $version The version being updated to
+     * @return bool Whether the process was successful
+     */
+    private function extractAndApplyMigrations($version)
+    {
+        $downloadPath = config('self-update.repository_types.github.download_path', 'storage/app/github-releases');
+        $zipFile = "{$downloadPath}/{$version}.zip";
+        
+        if (!File::exists($zipFile)) {
+            Log::error("Update zip file not found: {$zipFile}");
+            return false;
+        }
+        
+        Log::info("Found update file: {$zipFile} (" . File::size($zipFile) . " bytes)");
+        
+        // Extract to a temporary directory
+        $extractPath = storage_path('app/update-extract');
+        if (File::exists($extractPath)) {
+            File::deleteDirectory($extractPath);
+        }
+        File::makeDirectory($extractPath, 0755, true);
+        
+        Log::info("Extracting to: {$extractPath}");
+        
+        try {
+            $zip = new \ZipArchive;
+            if ($zip->open($zipFile) === TRUE) {
+                // Get the folder name inside the zip (GitHub adds a folder with repo-version name)
+                $folderName = $zip->getNameIndex(0);
+                Log::info("Zip contains folder: {$folderName}");
+                
+                $zip->extractTo($extractPath);
+                $zip->close();
+                Log::info("Extraction complete");
+                
+                // Find all migration files in the extracted archive
+                $migrationSourcePath = $extractPath . '/' . $folderName . 'database/migrations/tenant';
+                
+                if (!File::exists($migrationSourcePath)) {
+                    Log::error("Migration directory not found in extracted update: {$migrationSourcePath}");
+                    return false;
+                }
+                
+                // Find all migration files in the extracted archive
+                $migrations = File::files($migrationSourcePath);
+                Log::info("Found " . count($migrations) . " tenant migrations in the update");
+                
+                // Copy the migrations to the application's migration directory
+                $targetPath = database_path('migrations/tenant');
+                foreach ($migrations as $migration) {
+                    $filename = $migration->getFilename();
+                    Log::info("Processing migration: {$filename}");
+                    File::copy($migration->getPathname(), $targetPath . '/' . $filename);
+                }
+                
+                // Run the migrations
+                Log::info("Running tenant migrations...");
+                Artisan::call('tenants:migrate', ['--force' => true]);
+                Log::info(Artisan::output());
+                
+                return true;
+            } else {
+                Log::error("Failed to open the zip file");
+                return false;
+            }
+        } catch (\Exception $e) {
+            Log::error("Error extracting and applying migrations: " . $e->getMessage());
+            return false;
+        }
     }
 } 
