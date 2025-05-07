@@ -163,7 +163,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form id="createInstrumentForm" action="{{ route('tenant.instruments.store') }}" method="POST">
+                <form id="createInstrumentForm" action="{{ route('tenant.instruments.store') }}" method="POST" onsubmit="return false;">
                     @csrf
                     <div class="mb-3">
                         <label for="name" class="form-label">Name</label>
@@ -261,7 +261,87 @@
     document.addEventListener('DOMContentLoaded', function() {
         console.log('Document ready');
         
-        // Set up form submission handler
+        // Set up create form submission handler
+        document.getElementById('createInstrumentForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const form = this;
+            const url = form.getAttribute('action');
+            const nameField = document.getElementById('name');
+            const name = nameField.value;
+            const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            
+            // Show loading state
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Creating...';
+            submitBtn.disabled = true;
+            
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': token
+                },
+                body: JSON.stringify({
+                    name: name
+                })
+            })
+            .then(response => {
+                return response.json().then(data => {
+                    if (!response.ok) {
+                        throw { status: response.status, data: data };
+                    }
+                    return data;
+                });
+            })
+            .then(data => {
+                // Reset button state
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+                
+                // Clear the form
+                form.reset();
+                
+                // Close the modal
+                bootstrap.Modal.getInstance(document.getElementById('createInstrumentModal')).hide();
+                
+                // Show success message
+                Swal.fire({
+                    title: 'Success!',
+                    text: 'Instrument created successfully',
+                    icon: 'success',
+                    confirmButtonText: 'OK'
+                }).then(() => {
+                    window.location.reload();
+                });
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                
+                // Reset button state
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+                
+                let errorMessage = 'Name already exists';
+                
+                // Handle validation errors
+                if (error.status === 422 && error.data) {
+                    if (error.data.errors && error.data.errors.name) {
+                        errorMessage = error.data.errors.name[0];
+                    }
+                }
+                
+                Swal.fire({
+                    title: 'Error!',
+                    text: errorMessage,
+                    icon: 'error',
+                    confirmButtonText: 'OK'
+                });
+            });
+        });
+        
+        // Set up edit form submission handler
         document.getElementById('editInstrumentForm').addEventListener('submit', function(e) {
             e.preventDefault();
             
@@ -282,23 +362,42 @@
                     name: name
                 })
             })
-            .then(response => response.json())
-            .then(data => {
-                bootstrap.Modal.getInstance(document.getElementById('editInstrumentModal')).hide();
-                Swal.fire({
-                    title: 'Success!',
-                    text: 'Instrument updated successfully',
-                    icon: 'success',
-                    confirmButtonText: 'OK'
-                }).then(() => {
-                    window.location.reload();
+            .then(response => {
+                return response.json().then(data => {
+                    if (!response.ok) {
+                        throw { status: response.status, data: data };
+                    }
+                    return data;
                 });
+            })
+            .then(data => {
+                if (data.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('editInstrumentModal')).hide();
+                    Swal.fire({
+                        title: 'Success!',
+                        text: 'Instrument updated successfully',
+                        icon: 'success',
+                        confirmButtonText: 'OK'
+                    }).then(() => {
+                        window.location.reload();
+                    });
+                }
             })
             .catch(error => {
                 console.error('Error:', error);
+                
+                let errorMessage = 'Name already exists';
+                
+                // Handle validation errors
+                if (error.status === 422 && error.data) {
+                    if (error.data.errors && error.data.errors.name) {
+                        errorMessage = error.data.errors.name[0];
+                    }
+                }
+                
                 Swal.fire({
                     title: 'Error!',
-                    text: 'Failed to update instrument',
+                    text: errorMessage,
                     icon: 'error',
                     confirmButtonText: 'OK'
                 });

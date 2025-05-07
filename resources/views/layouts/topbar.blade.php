@@ -9,6 +9,26 @@
     
     // Create a slightly lighter version of primary for hover effects
     $primaryColorLight = $primaryColor . '20'; // Adding 20% opacity
+    
+    // Get current app version
+    $appVersion = config('self-update.version_installed') ?: 'v1.0.0';
+    
+    // Helper function to convert hex to RGB
+    function hexToRgb($hex) {
+        $hex = str_replace('#', '', $hex);
+        
+        if(strlen($hex) == 3) {
+            $r = hexdec(substr($hex, 0, 1).substr($hex, 0, 1));
+            $g = hexdec(substr($hex, 1, 1).substr($hex, 1, 1));
+            $b = hexdec(substr($hex, 2, 1).substr($hex, 2, 1));
+        } else {
+            $r = hexdec(substr($hex, 0, 2));
+            $g = hexdec(substr($hex, 2, 2));
+            $b = hexdec(substr($hex, 4, 2));
+        }
+        
+        return "$r, $g, $b";
+    }
 @endphp
 <!-- Navbar -->
 <nav class="navbar navbar-main navbar-expand-lg px-0 mx-4 shadow-none border-radius-xl" id="navbarBlur" navbar-scroll="true" style="background-color: rgba(255, 255, 255, 0.95); box-shadow: 0 2px 12px 0 rgba({{ hexToRgb($primaryColor) }}, 0.15) !important;">
@@ -33,6 +53,8 @@
             Settings
           @elseif(request()->is('subscription*'))
             Subscription
+          @elseif(request()->is('system-updates*'))
+            System Updates
           @else
             Dashboard
           @endif
@@ -80,6 +102,14 @@
             @endif
           </a>
         </li>
+        
+        <!-- Version Button -->
+        <li class="nav-item pe-3">
+          <a href="{{ route('tenant.system-updates.index') }}" class="btn btn-sm btn-outline-secondary mb-0">
+            <i class="fas fa-code-branch me-1"></i> {{ $appVersion }}
+          </a>
+        </li>
+        
         <!-- Profile Dropdown -->
         <li class="nav-item dropdown pe-2 d-flex align-items-center">
           <a href="javascript:;" class="nav-link text-body p-0" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
@@ -127,6 +157,13 @@
                 <span class="text-sm font-weight-normal">Settings</span>
               </a>
             </li>
+            <!-- Add System Updates link in dropdown menu -->
+            <li class="mb-2">
+              <a class="dropdown-item border-radius-md py-2 d-flex align-items-center" href="{{ route('tenant.system-updates.index') }}">
+                <i class="fas fa-code-branch text-primary me-2" style="font-size: 1rem; color: {{ $primaryColor }} !important;"></i>
+                <span class="text-sm font-weight-normal">System Updates</span>
+              </a>
+            </li>
             <li>
               <form method="POST" action="{{ route('tenant.logout') }}">
                 @csrf
@@ -152,23 +189,4 @@
     </div>
   </div>
 </nav>
-<!-- End Navbar -->
-
-@php
-// Helper function to convert hex to RGB
-function hexToRgb($hex) {
-    $hex = str_replace('#', '', $hex);
-    
-    if(strlen($hex) == 3) {
-        $r = hexdec(substr($hex, 0, 1).substr($hex, 0, 1));
-        $g = hexdec(substr($hex, 1, 1).substr($hex, 1, 1));
-        $b = hexdec(substr($hex, 2, 1).substr($hex, 2, 1));
-    } else {
-        $r = hexdec(substr($hex, 0, 2));
-        $g = hexdec(substr($hex, 2, 2));
-        $b = hexdec(substr($hex, 4, 2));
-    }
-    
-    return "$r, $g, $b";
-}
-@endphp 
+<!-- End Navbar --> 

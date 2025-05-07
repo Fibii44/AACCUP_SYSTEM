@@ -124,7 +124,7 @@
                                                     <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                                                         <div class="d-flex align-items-center">
                                                             <i class="fas fa-clipboard-list me-2 text-secondary"></i>
-                                                            <span>{{ $indicator->name }}</span>
+                                                            <span class="indicator-name">{{ $indicator->name }}</span>
                                                             @if($indicator->uploads && $indicator->uploads->count() > 0)
                                                             <span class="badge bg-success ms-2">{{ $indicator->uploads->count() }}</span>
                                                             @endif
@@ -399,6 +399,13 @@
         font-size: 0.75rem;
         padding: 0.25rem 0.5rem;
     }
+    .indicator-name {
+        max-width: 300px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: inline-block;
+    }
 </style>
 @endpush
 
@@ -430,7 +437,14 @@
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                     }
                 })
-                .then(response => response.json())
+                .then(response => {
+                    return response.json().then(data => {
+                        if (!response.ok) {
+                            throw { status: response.status, data: data };
+                        }
+                        return data;
+                    });
+                })
                 .then(data => {
                     // Reset button state
                     submitBtn.innerHTML = originalText;
@@ -456,9 +470,21 @@
                     submitBtn.disabled = false;
                     
                     console.error('Error:', error);
+                    
+                    let errorMessage = 'Name already exists';
+                    
+                    // Handle validation errors
+                    if (error.status === 422 && error.data) {
+                        if (error.data.message) {
+                            errorMessage = error.data.message;
+                        } else if (error.data.errors && error.data.errors.name) {
+                            errorMessage = error.data.errors.name[0];
+                        }
+                    }
+                    
                     Swal.fire({
                         title: 'Error!',
-                        text: 'Failed to create parameter',
+                        text: errorMessage,
                         icon: 'error',
                         confirmButtonText: 'OK'
                     });
@@ -563,7 +589,14 @@
                         name: name
                     })
                 })
-                .then(response => response.json())
+                .then(response => {
+                    return response.json().then(data => {
+                        if (!response.ok) {
+                            throw { status: response.status, data: data };
+                        }
+                        return data;
+                    });
+                })
                 .then(data => {
                     // Reset button state
                     submitBtn.innerHTML = originalText;
@@ -585,9 +618,21 @@
                     submitBtn.disabled = false;
                     
                     console.error('Error:', error);
+                    
+                    let errorMessage = 'Name already exists';
+                    
+                    // Handle validation errors
+                    if (error.status === 422 && error.data) {
+                        if (error.data.message) {
+                            errorMessage = error.data.message;
+                        } else if (error.data.errors && error.data.errors.name) {
+                            errorMessage = error.data.errors.name[0];
+                        }
+                    }
+                    
                     Swal.fire({
                         title: 'Error!',
-                        text: 'Failed to update parameter',
+                        text: errorMessage,
                         icon: 'error',
                         confirmButtonText: 'OK'
                     });
