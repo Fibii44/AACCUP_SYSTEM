@@ -11,6 +11,7 @@
     "require": {
         "php": "^8.2",
         "barryvdh/laravel-dompdf": "*",
+        "codedge/laravel-selfupdater": "^3.10",
         "google/apiclient": "^2.18",
         "laravel/framework": "^12.0",
         "laravel/socialite": "^5.19",
@@ -73,7 +74,8 @@
         "sort-packages": true,
         "allow-plugins": {
             "pestphp/pest-plugin": true,
-            "php-http/discovery": true
+            "php-http/discovery": true,
+            "phpstan/extension-installer": true
         }
     },
     "minimum-stability": "stable",

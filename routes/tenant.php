@@ -11,6 +11,7 @@ use App\Http\Controllers\Tenant\AreaController;
 use App\Http\Controllers\Tenant\ParameterController;
 use App\Http\Controllers\Tenant\IndicatorController;
 use App\Http\Controllers\Tenant\TenantReportController;
+use App\Http\Controllers\Tenant\SystemUpdateController;
 use App\Http\Middleware\RoleMiddleware;
 use Illuminate\Support\Facades\Route;
 use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
@@ -104,6 +105,18 @@ Route::middleware([
                 ->name('tenant.subscription.upgrade');
             Route::post('/subscription/downgrade', [SubscriptionController::class, 'downgrade'])
                 ->name('tenant.subscription.downgrade');
+                
+            // System Updates routes
+            Route::get('/system-updates', [SystemUpdateController::class, 'index'])
+                ->name('tenant.system-updates.index');
+            Route::post('/system-updates/check', [SystemUpdateController::class, 'check'])
+                ->name('tenant.system-updates.check');
+            Route::post('/system-updates/update', [SystemUpdateController::class, 'update'])
+                ->name('tenant.system-updates.update');
+            Route::post('/system-updates/rollback', [SystemUpdateController::class, 'rollback'])
+                ->name('tenant.system-updates.rollback');
+            Route::get('/system-updates/debug', [SystemUpdateController::class, 'debugVersion'])
+                ->name('tenant.system-updates.debug');
         });
 
         // Faculty routes

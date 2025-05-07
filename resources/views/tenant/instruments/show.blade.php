@@ -64,57 +64,64 @@
                         <h5 class="mb-0">Areas</h5>
                     </div>
                 </div>
-                <div class="card-body p-3">
-                    @if($instrument->areas->count() > 0)
-                        <div id="areas-content" class="row g-3">
+                <div class="card-body px-0 pt-0 pb-2">
+                    <div id="areas-container" class="p-3">
+                        @if($instrument->areas->count() > 0)
                             @foreach($instrument->areas as $area)
-                            <div class="col-12 mb-4">
-                                <div class="card">
-                                    <div class="card-header pb-0">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <h6 class="mb-0 text-sm">{{ $area->name }}</h6>
-                                            <div>
-                                                @if(auth()->user()->role === 'admin')
-                                                <button type="button" class="btn btn-sm btn-info" onclick="editArea({{ $area->id }}, '{{ $area->name }}')">
-                                                    <i class="fas fa-edit"></i> Edit
-                                                </button>
-                                                <button type="button" class="btn btn-sm btn-danger" onclick="deleteArea({{ $area->id }}, '{{ $area->name }}')">
-                                                    <i class="fas fa-trash"></i> Delete
-                                                </button>
-                                                @endif
-                                            </div>
+                            <div class="card mb-3 area-card" data-id="{{ $area->id }}">
+                                <div class="card-body py-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="d-flex align-items-center">
+                                            <h5 class="mb-0">{{ $area->name }}</h5>
                                         </div>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <div>
-                                                <span class="badge bg-info">{{ $area->parameters->count() }} Parameters</span>
-                                                <span class="badge bg-success">{{ $area->parameters->flatMap->indicators->count() }} Indicators</span>
+                                        <div class="d-flex">
+                                            <div class="me-3">
+                                                <span class="badge bg-info me-2">{{ $area->parameters->count() }} PARAMETERS</span>
+                                                <span class="badge bg-success">{{ $area->parameters->flatMap->indicators->count() }} INDICATORS</span>
                                             </div>
-                                            <div>
-                                                <a href="{{ route('tenant.instruments.area.show', [$instrument->id, $area->id]) }}" class="btn btn-sm btn-primary" style="background-color: {{ $primaryColor }}; border-color: {{ $primaryColor }};">
-                                                    <i class="fas fa-sitemap me-1"></i> View Details
-                                                </a>
+                                            <a href="{{ route('tenant.instruments.area.show', [$instrument->id, $area->id]) }}" class="btn btn-sm btn-primary me-2" style="background-color: {{ $primaryColor }}; border-color: {{ $primaryColor }};">
+                                                <i class="fas fa-eye"></i> View Details
+                                            </a>
+                                            <div class="dropdown">
+                                                <button class="btn btn-outline-secondary btn-sm px-2 py-1 rounded" id="dropdownMenuButton-{{ $area->id }}" data-bs-toggle="dropdown" aria-expanded="false">
+                                                    <i class="fas fa-ellipsis-h fa-lg"></i>
+                                                </button>
+                                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButton-{{ $area->id }}">
+                                                    @if(auth()->user()->role === 'admin')
+                                                    <li>
+                                                        <a class="dropdown-item edit-area" href="#" onclick="editArea({{ $area->id }}, '{{ $area->name }}'); return false;">
+                                                            <i class="fas fa-edit me-2"></i>Edit
+                                                        </a>
+                                                    </li>
+                                                    <li>
+                                                        <a class="dropdown-item text-danger delete-area" href="#" onclick="deleteArea({{ $area->id }}, '{{ $area->name }}'); return false;">
+                                                            <i class="fas fa-trash me-2"></i>Delete
+                                                        </a>
+                                                    </li>
+                                                    @endif
+                                                </ul>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             @endforeach
+                        @else
+                            <div id="no-areas-message" class="text-center py-4">
+                                <p class="text-muted mb-0">No areas have been created for this instrument yet.</p>
+                                @if(auth()->user()->role === 'admin')
+                                <button type="button" class="btn btn-primary mt-3" style="background-color: {{ $primaryColor }}; border-color: {{ $primaryColor }};" data-bs-toggle="modal" data-bs-target="#addAreaModal">
+                                    <i class="fas fa-plus me-1"></i> Create Your First Area
+                                </button>
+                                @endif
+                            </div>
+                        @endif
+                        <div id="areas-loading" class="text-center py-3" style="display: none;">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="ms-2">Loading areas...</span>
                         </div>
-                    @else
-                        <div id="no-areas-message" class="text-center py-4">
-                            <p class="text-muted mb-0">No areas have been created for this instrument yet.</p>
-                            <button type="button" class="btn btn-primary mt-3" style="background-color: {{ $primaryColor }}; border-color: {{ $primaryColor }};" data-bs-toggle="modal" data-bs-target="#addAreaModal">
-                                <i class="fas fa-plus me-1"></i> Create Your First Area
-                            </button>
-                        </div>
-                    @endif
-                    <div id="areas-loading" class="text-center py-3" style="display: none;">
-                        <div class="spinner-border" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                        <span class="ms-2">Loading areas...</span>
                     </div>
                 </div>
             </div>
@@ -506,12 +513,12 @@
             }
         })
         .then(response => {
-            if (!response.ok) {
-                return response.text().then(text => {
-                    throw new Error(text);
-                });
-            }
-            return response.json();
+            return response.json().then(data => {
+                if (!response.ok) {
+                    throw { status: response.status, data: data };
+                }
+                return data;
+            });
         })
         .then(data => {
             console.log('Success response:', data);
@@ -540,11 +547,22 @@
             submitBtn.innerHTML = originalText;
             submitBtn.disabled = false;
             
+            let errorMessage = 'An error occurred while updating the area';
+            
+            // Handle validation errors
+            if (error.status === 422 && error.data) {
+                if (error.data.message) {
+                    errorMessage = error.data.message;
+                } else if (error.data.errors && error.data.errors.name) {
+                    errorMessage = error.data.errors.name[0];
+                }
+            }
+            
             // Show error message
             Swal.fire({
                 icon: 'error',
                 title: 'Error',
-                text: 'An error occurred while updating the area: ' + error.message,
+                text: errorMessage,
                 confirmButtonColor: '{{ $primaryColor }}'
             });
         });
@@ -575,34 +593,12 @@
             }
         })
         .then(response => {
-            if (!response.ok) {
-                return response.text().then(text => {
-                    throw new Error(text);
-                });
-            }
-            
-            // Check if response is empty
-            if (response.status === 204 || response.headers.get('Content-Length') === '0') {
-                return { success: true };
-            }
-            
-            // Try to parse JSON
-            const contentType = response.headers.get('Content-Type');
-            if (contentType && contentType.includes('application/json')) {
-                return response.text().then(text => {
-                    if (!text || text.trim() === '') {
-                        return { success: true };
-                    }
-                    try {
-                        return JSON.parse(text);
-                    } catch (e) {
-                        console.warn('Failed to parse JSON response:', text);
-                        return { success: true };
-                    }
-                });
-            }
-            
-            return { success: true };
+            return response.json().then(data => {
+                if (!response.ok) {
+                    throw { status: response.status, data: data };
+                }
+                return data;
+            });
         })
         .then(data => {
             console.log('Success response:', data);
@@ -634,14 +630,54 @@
             submitBtn.innerHTML = originalText;
             submitBtn.disabled = false;
             
+            let errorMessage = 'Name already exists';
+            
+            // Handle validation errors
+            if (error.status === 422 && error.data) {
+                if (error.data.message) {
+                    errorMessage = error.data.message;
+                } else if (error.data.errors && error.data.errors.name) {
+                    errorMessage = error.data.errors.name[0];
+                }
+            } else if (error.message) {
+                errorMessage = 'An error occurred';
+            }
+            
             // Show error message
             Swal.fire({
                 icon: 'error',
                 title: 'Error',
-                text: 'An error occurred while creating the area: ' + error.message,
+                text: errorMessage,
                 confirmButtonColor: '{{ $primaryColor }}'
             });
         });
     }
 </script>
 @endsection
+
+@push('styles')
+<style>
+    .area-card {
+        transition: all 0.2s ease;
+        border: 1px solid #eee;
+    }
+    .area-card:hover {
+        border-color: #aaa;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .btn-outline-secondary {
+        border: 1px solid #ced4da;
+    }
+    .dropdown-toggle::after {
+        display: none;
+    }
+    .fa-ellipsis-h {
+        font-size: 1.25rem;
+        color: #6c757d;
+    }
+    .dropdown-menu-end {
+        right: 0;
+        left: auto;
+    }
+</style>
+@endpush

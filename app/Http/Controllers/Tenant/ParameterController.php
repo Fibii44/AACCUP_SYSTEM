@@ -85,27 +85,64 @@ class ParameterController extends Controller
      */
     public function store(Request $request, Area $area)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'order' => 'nullable|integer',
-        ]);
+        try {
+            $validated = $request->validate([
+                'name' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    function ($attribute, $value, $fail) use ($area) {
+                        // Check if a parameter with the same name already exists for this area
+                        $exists = Parameter::where('area_id', $area->id)
+                            ->where('name', $value)
+                            ->exists();
+                        
+                        if ($exists) {
+                            $fail('Name already exists');
+                        }
+                    }
+                ],
+                'description' => 'nullable|string',
+                'order' => 'nullable|integer',
+            ]);
 
-        $parameter = $area->parameters()->create($validated);
-        
-        // Create Google Drive folder for the parameter
-        if ($this->drive && $area->google_drive_folder_id) {
-            try {
-                $folderId = $this->createGoogleDriveFolder($parameter, $area);
-                if ($folderId) {
-                    $parameter->update(['google_drive_folder_id' => $folderId]);
+            $parameter = $area->parameters()->create($validated);
+            
+            // Create Google Drive folder for the parameter
+            if ($this->drive && $area->google_drive_folder_id) {
+                try {
+                    $folderId = $this->createGoogleDriveFolder($parameter, $area);
+                    if ($folderId) {
+                        $parameter->update(['google_drive_folder_id' => $folderId]);
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('Failed to create Google Drive folder for parameter: ' . $e->getMessage());
                 }
-            } catch (\Exception $e) {
-                Log::warning('Failed to create Google Drive folder for parameter: ' . $e->getMessage());
             }
+            
+            return response()->json([
+                'success' => true,
+                'data' => $parameter
+            ], 201);
+            
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false, 
+                'message' => 'Name already exists',
+                'errors' => $e->errors()
+            ], 422);
+            
+        } catch (\Exception $e) {
+            Log::error('Error creating parameter', [
+                'area_id' => $area->id,
+                'error' => $e->getMessage()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create parameter: ' . $e->getMessage()
+            ], 500);
         }
-        
-        return response()->json($parameter, 201);
     }
 
     /**
@@ -113,30 +150,69 @@ class ParameterController extends Controller
      */
     public function update(Request $request, Parameter $parameter)
     {
-        $validated = $request->validate([
-            'name' => 'sometimes|required|string|max:255',
-            'description' => 'nullable|string',
-            'order' => 'nullable|integer',
-        ]);
+        try {
+            $validated = $request->validate([
+                'name' => [
+                    'sometimes',
+                    'required',
+                    'string',
+                    'max:255',
+                    function ($attribute, $value, $fail) use ($parameter) {
+                        // Check if another parameter with the same name already exists for this area
+                        $exists = Parameter::where('area_id', $parameter->area_id)
+                            ->where('name', $value)
+                            ->where('id', '!=', $parameter->id)
+                            ->exists();
+                        
+                        if ($exists) {
+                            $fail('Name already exists');
+                        }
+                    }
+                ],
+                'description' => 'nullable|string',
+                'order' => 'nullable|integer',
+            ]);
 
-        // Check if name is changed to update Google Drive folder
-        if (isset($validated['name']) && $validated['name'] !== $parameter->name) {
-            $oldName = $parameter->name;
-            $newName = $validated['name'];
-            
-            // Rename Google Drive folder if it exists
-            if ($this->drive && $parameter->google_drive_folder_id) {
-                try {
-                    $this->renameGoogleDriveFolder($parameter, $newName);
-                } catch (\Exception $e) {
-                    Log::warning('Failed to rename Google Drive folder for parameter: ' . $e->getMessage());
+            // Check if name is changed to update Google Drive folder
+            if (isset($validated['name']) && $validated['name'] !== $parameter->name) {
+                $oldName = $parameter->name;
+                $newName = $validated['name'];
+                
+                // Rename Google Drive folder if it exists
+                if ($this->drive && $parameter->google_drive_folder_id) {
+                    try {
+                        $this->renameGoogleDriveFolder($parameter, $newName);
+                    } catch (\Exception $e) {
+                        Log::warning('Failed to rename Google Drive folder for parameter: ' . $e->getMessage());
+                    }
                 }
             }
-        }
 
-        $parameter->update($validated);
-        
-        return response()->json($parameter);
+            $parameter->update($validated);
+            
+            return response()->json([
+                'success' => true,
+                'data' => $parameter
+            ]);
+            
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false, 
+                'message' => 'Name already exists',
+                'errors' => $e->errors()
+            ], 422);
+            
+        } catch (\Exception $e) {
+            Log::error('Error updating parameter', [
+                'id' => $parameter->id,
+                'error' => $e->getMessage()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update parameter: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -144,14 +220,25 @@ class ParameterController extends Controller
      */
     public function destroy(Parameter $parameter)
     {
-        // Delete Google Drive folder if it exists
-        if ($this->drive && $parameter->google_drive_folder_id) {
+        // Check if any indicators within this parameter have uploads
+        $hasUploads = false;
+        foreach ($parameter->indicators as $indicator) {
+            if ($indicator->uploads()->exists()) {
+                $hasUploads = true;
+                break;
+            }
+        }
+
+        // Delete Google Drive folder if it exists AND no uploads exist
+        if ($this->drive && $parameter->google_drive_folder_id && !$hasUploads) {
             try {
                 $this->drive->files->delete($parameter->google_drive_folder_id);
                 Log::info('Deleted Google Drive folder for parameter: ' . $parameter->name);
             } catch (\Exception $e) {
                 Log::warning('Failed to delete Google Drive folder for parameter: ' . $e->getMessage());
             }
+        } else if ($hasUploads && $parameter->google_drive_folder_id) {
+            Log::info('Preserved Google Drive folder for parameter because it contains indicators with uploads: ' . $parameter->name);
         }
 
         $parameter->delete();

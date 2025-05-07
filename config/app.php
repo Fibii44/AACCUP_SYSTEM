@@ -156,6 +156,7 @@ return [
         App\Providers\VoltServiceProvider::class,
         App\Providers\AppServiceProviderCustom::class,
         App\Providers\TenantDatabaseProvider::class,
+        App\Providers\UpdateServiceProvider::class,
     ])->toArray(),
 
 ];
