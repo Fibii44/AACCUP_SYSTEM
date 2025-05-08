@@ -8,6 +8,22 @@
     <!-- Add CSS for dropdown positioning -->
     @push('styles')
     <style>
+        :root {
+                --primary: #000435;
+                --highlight: #FFC100;
+                --text-light: #FFFFFF;
+        }
+        
+        :root.dark, .dark {
+            --bg-background: #000435 !important;
+        }
+        
+        .dark body, 
+        .dark .bg-background, 
+        .dark .bg-default {
+            background-color: #000435 !important;
+        }
+        
         .dropdown {
             position: relative;
             display: inline-block;
@@ -95,7 +111,7 @@
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.dataTables.min.css">
 
-    <div class="bg-white rounded-lg shadow-sm overflow-hidden mb-8">
+    <div class="bg-white dark:bg-primary rounded-lg shadow-sm overflow-hidden mb-8">
         <div class="px-6 py-5 border-b border-gray-200">
             <h3 class="text-lg font-semibold text-gray-500">Tenants</h3>
         </div>

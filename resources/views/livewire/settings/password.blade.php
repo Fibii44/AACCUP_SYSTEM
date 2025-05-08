@@ -38,6 +38,19 @@ new class extends Component {
 }; ?>
 
 <section class="w-full">
+    <style>
+        /* Custom dark mode styling */
+        :root.dark, .dark {
+            --bg-background: #000435 !important;
+        }
+        
+        .dark body, 
+        .dark .bg-background, 
+        .dark .bg-default {
+            background-color: #000435 !important;
+        }
+    </style>
+    
     @include('partials.settings-heading')
 
     <x-settings.layout :heading="__('Update password')" :subheading="__('Ensure your account is using a long, random password to stay secure')">
