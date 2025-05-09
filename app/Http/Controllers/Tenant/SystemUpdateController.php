@@ -346,6 +346,22 @@ class SystemUpdateController extends Controller
             Log::info("Rolling back from {$currentVersion} to {$previousVersion}");
             $rollbackResult = true;
             
+            // Download and extract the previous version's source code
+            try {
+                Log::info("Downloading and extracting source for version {$previousVersion}");
+                $sourceRestored = $this->downloadAndRestoreVersion($previousVersion);
+                if (!$sourceRestored) {
+                    Log::error("Failed to restore source code for version {$previousVersion}");
+                    return redirect()->route('tenant.system-updates.index')
+                        ->with('error', 'Failed to restore source code for version ' . $previousVersion);
+                }
+                Log::info("Successfully restored source code for version {$previousVersion}");
+            } catch (\Exception $e) {
+                Log::error("Error restoring source code: " . $e->getMessage());
+                return redirect()->route('tenant.system-updates.index')
+                    ->with('error', 'Error restoring source code: ' . $e->getMessage());
+            }
+            
             // Rollback tenant database migrations
             try {
                 Log::info("Rolling back tenant database migrations...");
@@ -389,7 +405,7 @@ class SystemUpdateController extends Controller
             ]);
             
             return redirect()->route('tenant.system-updates.index')
-                ->with('success', 'Successfully rolled back to version ' . $previousVersion . ' and reverted database changes');
+                ->with('success', 'Successfully rolled back to version ' . $previousVersion . ' and restored files and database');
         } catch (\Exception $e) {
             Log::error('Error during rollback: ' . $e->getMessage());
             
@@ -770,6 +786,166 @@ class SystemUpdateController extends Controller
         } catch (\Exception $e) {
             Log::error("Error extracting and applying migrations: " . $e->getMessage());
             return false;
+        }
+    }
+
+    /**
+     * Download and restore a specific version's source code
+     * 
+     * @param string $version The version to restore
+     * @return bool Whether the restoration was successful
+     */
+    private function downloadAndRestoreVersion($version)
+    {
+        try {
+            // Get GitHub repository details from config
+            $githubConfig = config('self-update.repository_types.github');
+            $vendor = $githubConfig['repository_vendor'];
+            $repo = $githubConfig['repository_name'];
+            $token = $githubConfig['private_access_token'];
+            $downloadPath = $githubConfig['download_path'];
+            
+            if (empty($vendor) || empty($repo)) {
+                Log::warning("GitHub configuration missing vendor or repo name");
+                return false;
+            }
+            
+            // Ensure download directory exists
+            if (!File::exists(storage_path($downloadPath))) {
+                File::makeDirectory(storage_path($downloadPath), 0755, true);
+            }
+            
+            // Setup the release download URL
+            $downloadUrl = "https://github.com/{$vendor}/{$repo}/archive/refs/tags/{$version}.zip";
+            $zipFile = storage_path("{$downloadPath}/{$version}.zip");
+            
+            // Check if we already have the file downloaded
+            if (!File::exists($zipFile)) {
+                Log::info("Downloading source code for version {$version} from {$downloadUrl}");
+                
+                // Setup HTTP client with appropriate headers
+                $client = new Client();
+                $headers = [
+                    'User-Agent' => 'SystemRollback'
+                ];
+                
+                if (!empty($token)) {
+                    $headers['Authorization'] = "token {$token}";
+                }
+                
+                // Download the file
+                $response = $client->request('GET', $downloadUrl, [
+                    'headers' => $headers,
+                    'sink' => $zipFile
+                ]);
+                
+                if ($response->getStatusCode() !== 200) {
+                    Log::error("Failed to download version {$version}, HTTP status: " . $response->getStatusCode());
+                    return false;
+                }
+            } else {
+                Log::info("Using previously downloaded file for version {$version}");
+            }
+            
+            // Extract the downloaded zip file
+            $extractPath = storage_path('app/rollback-extract');
+            
+            // Clean up existing extraction directory
+            if (File::exists($extractPath)) {
+                File::deleteDirectory($extractPath);
+            }
+            File::makeDirectory($extractPath, 0755, true);
+            
+            Log::info("Extracting {$zipFile} to {$extractPath}");
+            
+            $zip = new \ZipArchive;
+            if ($zip->open($zipFile) !== true) {
+                Log::error("Failed to open the zip file: {$zipFile}");
+                return false;
+            }
+            
+            // Extract all files
+            $zip->extractTo($extractPath);
+            $zip->close();
+            
+            // Determine the root directory inside the zip (typically repo-version format)
+            $directories = File::directories($extractPath);
+            if (count($directories) === 0) {
+                Log::error("No root directory found in extracted zip");
+                return false;
+            }
+            
+            $extractedRoot = $directories[0];
+            Log::info("Extracted files to: {$extractedRoot}");
+            
+            // Prepare list of directories to exclude from replacement
+            $excludeDirectories = config('self-update.exclude_folders', []);
+            Log::info("Excluding directories: " . implode(', ', $excludeDirectories));
+            
+            // Copy files from the extracted directory to the app root, skipping excluded directories
+            $this->copyDirectoryContents($extractedRoot, base_path(), $excludeDirectories);
+            
+            // Clean up
+            Log::info("Cleaning up temporary files");
+            File::deleteDirectory($extractPath);
+            
+            return true;
+        } catch (\Exception $e) {
+            Log::error("Error downloading and restoring version {$version}: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Copy directory contents recursively, excluding specified directories
+     * 
+     * @param string $source Source directory
+     * @param string $destination Destination directory 
+     * @param array $excludeDirectories Directories to exclude
+     * @return void
+     */
+    private function copyDirectoryContents($source, $destination, $excludeDirectories = [])
+    {
+        // Normalize paths to ensure consistent comparisons
+        $source = rtrim($source, '/\\') . DIRECTORY_SEPARATOR;
+        $destination = rtrim($destination, '/\\') . DIRECTORY_SEPARATOR;
+        
+        // Get all items from the source directory
+        $items = File::allFiles($source);
+        
+        foreach ($items as $item) {
+            // Get relative path from the source root
+            $relativePath = str_replace($source, '', $item->getPathname());
+            $targetPath = $destination . $relativePath;
+            
+            // Check if this file is in an excluded directory
+            $shouldExclude = false;
+            foreach ($excludeDirectories as $excludeDir) {
+                if (strpos($relativePath, $excludeDir . DIRECTORY_SEPARATOR) === 0 || $relativePath === $excludeDir) {
+                    $shouldExclude = true;
+                    break;
+                }
+            }
+            
+            // Skip if it's in an excluded directory
+            if ($shouldExclude) {
+                Log::info("Skipping excluded file: {$relativePath}");
+                continue;
+            }
+            
+            // Create target directory if it doesn't exist
+            $targetDir = dirname($targetPath);
+            if (!File::exists($targetDir)) {
+                File::makeDirectory($targetDir, 0755, true);
+            }
+            
+            // Copy the file
+            try {
+                File::copy($item->getPathname(), $targetPath);
+                // Log::debug("Copied: {$relativePath}");
+            } catch (\Exception $e) {
+                Log::warning("Failed to copy {$relativePath}: " . $e->getMessage());
+            }
         }
     }
 } 
