@@ -195,6 +195,7 @@ class SystemUpdateController extends Controller
                 Log::info("Successfully downloaded source code for version {$newVersion}");
                 
                 // Now extract and apply the files
+                Log::info("Starting file extraction and copy process");
                 $extractSuccess = $this->extractAndApplyRelease($newVersion);
                 if (!$extractSuccess) {
                     Log::error("Failed to extract and apply the update files for version {$newVersion}");
@@ -202,7 +203,7 @@ class SystemUpdateController extends Controller
                         ->with('error', "Failed to extract update files. Please try again.");
                 }
                 
-                Log::info("Successfully extracted and applied updates for version {$newVersion}");
+                Log::info("Successfully extracted and applied file updates for version {$newVersion}");
                 $updateResult = true;
             } catch (\Exception $e) {
                 Log::error("Error with direct update method: " . $e->getMessage());
@@ -285,22 +286,30 @@ class SystemUpdateController extends Controller
             
             if ($updateResult) {
                 // Clear cache, update routes, etc.
+                Log::info("File copy completed successfully. Clearing application cache...");
                 Artisan::call('optimize:clear');
                 
+                // Now run tenant migrations AFTER the file copy is complete
                 // Skip main application migrations since we're in tenant context
                 // Artisan::call('migrate', ['--force' => true]);
                 
                 // Only run tenant migrations and ignore errors about existing tables
                 try {
+                    Log::info('------- STARTING DATABASE MIGRATIONS -------');
                     Log::info('Running tenant migrations...');
+                    
                     // Use our custom method to run only new migrations
                     $migrationResult = $this->runNewTenantMigrations();
                     
-                    if ($migrationResult) {
+                    if ($migrationResult === true) {
                         Log::info('Tenant migrations completed successfully');
+                    } else if (is_array($migrationResult)) {
+                        Log::info('Tenant migrations completed with info: ' . json_encode($migrationResult));
                     } else {
                         Log::warning('Tenant migrations had issues');
                     }
+                    
+                    Log::info('------- COMPLETED DATABASE MIGRATIONS -------');
                 } catch (\Exception $e) {
                     Log::warning('Tenant migration error (non-fatal): ' . $e->getMessage());
                     // Log the detailed exception
@@ -948,8 +957,40 @@ class SystemUpdateController extends Controller
             
             Log::info("Rolling back from {$currentVersion} to {$previousVersion}");
             
+            // First, roll back database migrations BEFORE changing files
+            // This ensures DB stays in sync with code
+            try {
+                Log::info("------- STARTING DATABASE ROLLBACK -------");
+                Log::info("Rolling back tenant database migrations...");
+                
+                // Get the current batch number
+                $batch = \DB::table('migrations')->max('batch');
+                Log::info("Current migration batch: {$batch}");
+                
+                // Get migrations in the current batch
+                $migrationsToRollback = \DB::table('migrations')
+                    ->where('batch', $batch)
+                    ->pluck('migration')
+                    ->toArray();
+                
+                Log::info("Migrations to roll back: " . implode(", ", $migrationsToRollback));
+                
+                Artisan::call('tenants:rollback', [
+                    '--step' => 1,  // Roll back one migration batch
+                    '--force' => true
+                ]);
+                
+                $rollbackOutput = Artisan::output();
+                Log::info("Migration rollback output: {$rollbackOutput}");
+                Log::info("------- COMPLETED DATABASE ROLLBACK -------");
+            } catch (\Exception $e) {
+                Log::warning("Tenant migration rollback error (non-fatal): " . $e->getMessage());
+                // Continue despite migration errors
+            }
+            
             // Download and extract the previous version's source code
             try {
+                Log::info("------- STARTING FILE RESTORATION -------");
                 Log::info("Downloading and extracting source for version {$previousVersion}");
                 
                 // First try using the enhanced extraction method from the update process
@@ -992,24 +1033,12 @@ class SystemUpdateController extends Controller
                 }
                 
                 Log::info("Successfully restored source code for version {$previousVersion}");
+                Log::info("------- COMPLETED FILE RESTORATION -------");
             } catch (\Exception $e) {
                 Log::error("Error restoring source code: " . $e->getMessage());
                 Log::error("Stack trace: " . $e->getTraceAsString());
                 return redirect()->route('tenant.system-updates.index')
                     ->with('error', 'Error restoring source code: ' . $e->getMessage());
-            }
-            
-            // Rollback tenant database migrations
-            try {
-                Log::info("Rolling back tenant database migrations...");
-                Artisan::call('tenants:rollback', [
-                    '--step' => 1,  // Roll back one migration batch
-                    '--force' => true
-                ]);
-                Log::info("Migration rollback output: " . Artisan::output());
-            } catch (\Exception $e) {
-                Log::warning("Tenant migration rollback error (non-fatal): " . $e->getMessage());
-                // Continue despite migration errors
             }
             
             try {
@@ -1332,21 +1361,30 @@ class SystemUpdateController extends Controller
                 }
             }
             
+            if (empty($newMigrations)) {
+                Log::info("No new migrations found to run");
+                return ['status' => 'no_migrations'];
+            }
+            
             // Run each new migration individually
+            $migrationsRun = [];
             foreach ($newMigrations as $migration) {
-                Log::info("Running migration: " . basename($migration));
+                $migrationName = basename($migration);
+                Log::info("Running migration: " . $migrationName);
                 \Artisan::call('migrate', [
-                    '--path' => 'database/migrations/tenant/' . basename($migration),
+                    '--path' => 'database/migrations/tenant/' . $migrationName,
                     '--force' => true,
                 ]);
                 
                 $output = \Artisan::output();
                 if ($output) {
-                    Log::info("Migration output: " . $output);
+                    Log::info("Migration output for {$migrationName}: " . $output);
                 }
+                
+                $migrationsRun[] = $migrationName;
             }
             
-            return true;
+            return ['status' => 'success', 'migrations_run' => $migrationsRun];
         } catch (\Exception $e) {
             Log::error("Error running migrations: " . $e->getMessage());
             return false;
