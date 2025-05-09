@@ -810,6 +810,7 @@ class SystemUpdateController extends Controller
     {
         try {
             $currentVersion = config('self-update.version_installed');
+            Log::info("Starting rollback from version {$currentVersion}");
             
             // Get available GitHub releases to determine the correct rollback version
             $previousVersion = $this->getPreviousRelease($currentVersion);
@@ -821,20 +822,54 @@ class SystemUpdateController extends Controller
             }
             
             Log::info("Rolling back from {$currentVersion} to {$previousVersion}");
-            $rollbackResult = true;
             
             // Download and extract the previous version's source code
             try {
                 Log::info("Downloading and extracting source for version {$previousVersion}");
-                $sourceRestored = $this->downloadAndRestoreVersion($previousVersion);
+                
+                // First try using the enhanced extraction method from the update process
+                $sourceRestored = $this->extractAndApplyRelease($previousVersion);
+                
+                // If that fails, try the dedicated rollback method
+                if (!$sourceRestored) {
+                    Log::warning("Failed to use standard extraction process, trying rollback-specific method");
+                    $sourceRestored = $this->downloadAndRestoreVersion($previousVersion);
+                }
+                
                 if (!$sourceRestored) {
                     Log::error("Failed to restore source code for version {$previousVersion}");
+                    
+                    // Check if the zip file exists in any of our possible locations
+                    $possiblePaths = [
+                        storage_path('app/github-releases'),
+                        storage_path('tenantitdept/app/github-releases'),
+                        storage_path('tenantitdept/storage/app/github-releases'),
+                        base_path('storage/tenantitdept/storage/app/github-releases'),
+                        base_path('storage/tenantitdept/app/github-releases')
+                    ];
+                    
+                    $zipExists = false;
+                    foreach ($possiblePaths as $path) {
+                        $testPath = $path . '/' . $previousVersion . '.zip';
+                        if (file_exists($testPath)) {
+                            $zipExists = true;
+                            Log::info("ZIP file exists at {$testPath} but extraction failed");
+                            break;
+                        }
+                    }
+                    
+                    if (!$zipExists) {
+                        Log::error("ZIP file for version {$previousVersion} doesn't exist in any location");
+                    }
+                    
                     return redirect()->route('tenant.system-updates.index')
                         ->with('error', 'Failed to restore source code for version ' . $previousVersion);
                 }
+                
                 Log::info("Successfully restored source code for version {$previousVersion}");
             } catch (\Exception $e) {
                 Log::error("Error restoring source code: " . $e->getMessage());
+                Log::error("Stack trace: " . $e->getTraceAsString());
                 return redirect()->route('tenant.system-updates.index')
                     ->with('error', 'Error restoring source code: ' . $e->getMessage());
             }
@@ -885,6 +920,7 @@ class SystemUpdateController extends Controller
                 ->with('success', 'Successfully rolled back to version ' . $previousVersion . ' and restored files and database');
         } catch (\Exception $e) {
             Log::error('Error during rollback: ' . $e->getMessage());
+            Log::error("Stack trace: " . $e->getTraceAsString());
             
             // Record the error
             $currentVersion = config('self-update.version_installed');
