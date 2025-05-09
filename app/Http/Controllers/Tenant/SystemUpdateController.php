@@ -180,72 +180,107 @@ class SystemUpdateController extends Controller
                     ->with('info', "No updates available. Current version: {$currentVersion}");
             }
             
-            // Start the update process
+            // First, try downloading the release directly using our custom method
+            // This is more reliable than using the package's download mechanism
             try {
-                // We need to use reflection to create a Release object to pass to the update method
-                $release = null;
+                Log::info("Attempting direct download of version {$newVersion}");
+                $downloadSuccess = $this->downloadReleaseZip($newVersion);
                 
-                try {
-                    // Get the Release class
-                    $reflectionClass = new \ReflectionClass('Codedge\Updater\Models\Release');
-                    
-                    // Check if we can instantiate it
-                    if ($reflectionClass->isInstantiable()) {
-                        // Create a Release object with the constructor parameters
-                        $release = $reflectionClass->newInstance();
-                        
-                        // Set version using reflection if needed
-                        if ($reflectionClass->hasProperty('version')) {
-                            $versionProperty = $reflectionClass->getProperty('version');
-                            $versionProperty->setAccessible(true);
-                            $versionProperty->setValue($release, $newVersion);
-                        }
-                        
-                        // Now pass the Release object to the update method
-                        $updateSource = $this->updater->source();
-                        $updateResult = $updateSource->update($release);
-                    } else {
-                        Log::warning("Release class exists but is not instantiable");
-                        $updateResult = false;
-                    }
-                } catch (\Exception $e) {
-                    Log::error("Error creating Release object: " . $e->getMessage());
-                    $updateResult = false;
+                if (!$downloadSuccess) {
+                    Log::error("Failed to download the release ZIP for version {$newVersion}");
+                    return redirect()->route('tenant.system-updates.index')
+                        ->with('error', "Failed to download update files. Please try again.");
                 }
                 
-                // If the above doesn't work, try an alternative approach
-                if (!isset($updateResult) || $updateResult === false) {
-                    Log::warning("Trying alternative update approach");
-                    
-                    // Try to get a release object directly from package internals
+                Log::info("Successfully downloaded source code for version {$newVersion}");
+                
+                // Now extract and apply the files
+                $extractSuccess = $this->extractAndApplyRelease($newVersion);
+                if (!$extractSuccess) {
+                    Log::error("Failed to extract and apply the update files for version {$newVersion}");
+                    return redirect()->route('tenant.system-updates.index')
+                        ->with('error', "Failed to extract update files. Please try again.");
+                }
+                
+                Log::info("Successfully extracted and applied updates for version {$newVersion}");
+                $updateResult = true;
+            } catch (\Exception $e) {
+                Log::error("Error with direct update method: " . $e->getMessage());
+                
+                // Fall back to the package's update method
+                Log::info("Falling back to package update method");
+                try {
+                    // Start the update process using the package
                     try {
-                        $updateSource = $this->updater->source();
-                        $releaseCollection = $updateSource->getReleases();
+                        // We need to use reflection to create a Release object to pass to the update method
+                        $release = null;
                         
-                        if ($releaseCollection instanceof \Illuminate\Support\Collection && $releaseCollection->isNotEmpty()) {
-                            // Get the first release from the collection
-                            $firstRelease = $releaseCollection->first();
+                        try {
+                            // Get the Release class
+                            $reflectionClass = new \ReflectionClass('Codedge\Updater\Models\Release');
                             
-                            // Pass it to the update method
-                            $updateResult = $updateSource->update($firstRelease);
-                        } else {
-                            Log::warning("No releases found in collection");
+                            // Check if we can instantiate it
+                            if ($reflectionClass->isInstantiable()) {
+                                // Create a Release object with the constructor parameters
+                                $release = $reflectionClass->newInstance();
+                                
+                                // Set version using reflection if needed
+                                if ($reflectionClass->hasProperty('version')) {
+                                    $versionProperty = $reflectionClass->getProperty('version');
+                                    $versionProperty->setAccessible(true);
+                                    $versionProperty->setValue($release, $newVersion);
+                                }
+                                
+                                // Now pass the Release object to the update method
+                                $updateSource = $this->updater->source();
+                                $updateResult = $updateSource->update($release);
+                            } else {
+                                Log::warning("Release class exists but is not instantiable");
+                                $updateResult = false;
+                            }
+                        } catch (\Exception $e) {
+                            Log::error("Error creating Release object: " . $e->getMessage());
+                            $updateResult = false;
+                        }
+                        
+                        // If the above doesn't work, try an alternative approach
+                        if (!isset($updateResult) || $updateResult === false) {
+                            Log::warning("Trying alternative update approach");
+                            
+                            // Try to get a release object directly from package internals
+                            try {
+                                $updateSource = $this->updater->source();
+                                $releaseCollection = $updateSource->getReleases();
+                                
+                                if ($releaseCollection instanceof \Illuminate\Support\Collection && $releaseCollection->isNotEmpty()) {
+                                    // Get the first release from the collection
+                                    $firstRelease = $releaseCollection->first();
+                                    
+                                    // Pass it to the update method
+                                    $updateResult = $updateSource->update($firstRelease);
+                                } else {
+                                    Log::warning("No releases found in collection");
+                                    $updateResult = false;
+                                }
+                            } catch (\Exception $e) {
+                                Log::error("Error with alternative update approach: " . $e->getMessage());
+                                $updateResult = false;
+                            }
+                        }
+                        
+                        // Do NOT set updateResult to true if all approaches failed
+                        if (!isset($updateResult)) {
+                            Log::error("All update approaches failed");
                             $updateResult = false;
                         }
                     } catch (\Exception $e) {
-                        Log::error("Error with alternative update approach: " . $e->getMessage());
+                        Log::error('Error during package update: ' . $e->getMessage());
                         $updateResult = false;
                     }
+                } catch (\Exception $e) {
+                    Log::error('Error during fallback update: ' . $e->getMessage());
+                    $updateResult = false;
                 }
-                
-                // Last resort - mock it for testing
-                if (!isset($updateResult) || $updateResult === false) {
-                    Log::warning("All update approaches failed, using manual process for testing");
-                    $updateResult = true;
-                }
-            } catch (\Exception $e) {
-                Log::error('Error during package update: ' . $e->getMessage());
-                $updateResult = true; // For testing
             }
             
             if ($updateResult) {
@@ -323,6 +358,166 @@ class SystemUpdateController extends Controller
             
             return redirect()->route('tenant.system-updates.index')
                 ->with('error', 'Error during update: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Download a GitHub release ZIP file
+     * 
+     * @param string $version The version to download
+     * @return bool Whether the download was successful
+     */
+    private function downloadReleaseZip($version)
+    {
+        try {
+            // Get GitHub repository details from config
+            $githubConfig = config('self-update.repository_types.github');
+            $vendor = $githubConfig['repository_vendor'];
+            $repo = $githubConfig['repository_name'];
+            $token = $githubConfig['private_access_token'];
+            
+            // Make sure we have the proper download path
+            $downloadPath = storage_path('app/github-releases');
+            
+            // Create download directory if it doesn't exist
+            if (!file_exists($downloadPath)) {
+                if (!mkdir($downloadPath, 0755, true)) {
+                    Log::error("Failed to create download directory: {$downloadPath}");
+                    return false;
+                }
+            }
+            
+            // Setup the release download URL
+            $downloadUrl = "https://github.com/{$vendor}/{$repo}/archive/refs/tags/{$version}.zip";
+            $zipFile = $downloadPath . '/' . $version . '.zip';
+            
+            // Use GuzzleHttp client to download the file
+            $client = new Client();
+            $headers = [
+                'User-Agent' => 'SystemUpdater'
+            ];
+            
+            if (!empty($token)) {
+                $headers['Authorization'] = "token {$token}";
+            }
+            
+            Log::info("Downloading from: {$downloadUrl}");
+            Log::info("Saving to: {$zipFile}");
+            
+            // Download the file
+            $response = $client->request('GET', $downloadUrl, [
+                'headers' => $headers,
+                'sink' => $zipFile,
+                'timeout' => config('self-update.download_timeout', 300)
+            ]);
+            
+            // Verify download success
+            if ($response->getStatusCode() !== 200) {
+                Log::error("Failed to download version {$version}, HTTP status: " . $response->getStatusCode());
+                return false;
+            }
+            
+            if (!file_exists($zipFile)) {
+                Log::error("File not found after download: {$zipFile}");
+                return false;
+            }
+            
+            $fileSize = filesize($zipFile);
+            if ($fileSize <= 0) {
+                Log::error("Downloaded file is empty: {$zipFile}");
+                return false;
+            }
+            
+            Log::info("Successfully downloaded {$version}.zip ({$fileSize} bytes)");
+            return true;
+            
+        } catch (\Exception $e) {
+            Log::error("Error downloading release zip: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Extract and apply a downloaded release
+     * 
+     * @param string $version The version to extract and apply
+     * @return bool Whether the extraction and application was successful
+     */
+    private function extractAndApplyRelease($version)
+    {
+        try {
+            // Make sure we have the proper download path
+            $downloadPath = storage_path('app/github-releases');
+            $zipFile = $downloadPath . '/' . $version . '.zip';
+            
+            if (!file_exists($zipFile)) {
+                Log::error("Update zip file not found: {$zipFile}");
+                return false;
+            }
+            
+            // Verify that ZipArchive class exists
+            if (!class_exists('ZipArchive')) {
+                Log::error("ZipArchive class not found. PHP zip extension may not be installed.");
+                return false;
+            }
+            
+            // Extract to a temporary directory
+            $extractPath = storage_path('app/update-extract');
+            if (file_exists($extractPath)) {
+                File::deleteDirectory($extractPath);
+            }
+            
+            if (!File::makeDirectory($extractPath, 0755, true)) {
+                Log::error("Failed to create extraction directory: {$extractPath}");
+                return false;
+            }
+            
+            Log::info("Extracting {$zipFile} to {$extractPath}");
+            
+            $zip = new \ZipArchive();
+            $openResult = $zip->open($zipFile);
+            
+            if ($openResult !== true) {
+                Log::error("Failed to open zip file. Error code: " . $openResult);
+                return false;
+            }
+            
+            // Extract the zip file
+            $extractResult = $zip->extractTo($extractPath);
+            $zip->close();
+            
+            if (!$extractResult) {
+                Log::error("Failed to extract zip file");
+                return false;
+            }
+            
+            Log::info("Successfully extracted zip file");
+            
+            // Determine the root directory inside the zip (typically repo-version format)
+            $directories = File::directories($extractPath);
+            if (count($directories) === 0) {
+                Log::error("No root directory found in extracted zip");
+                return false;
+            }
+            
+            $extractedRoot = $directories[0];
+            Log::info("Extracted files to: {$extractedRoot}");
+            
+            // Prepare list of directories to exclude from replacement
+            $excludeDirectories = config('self-update.exclude_folders', []);
+            Log::info("Excluding directories: " . implode(', ', $excludeDirectories));
+            
+            // Copy files from the extracted directory to the app root, skipping excluded directories
+            $this->copyDirectoryContents($extractedRoot, base_path(), $excludeDirectories);
+            
+            // Clean up
+            Log::info("Cleaning up temporary files");
+            File::deleteDirectory($extractPath);
+            
+            return true;
+        } catch (\Exception $e) {
+            Log::error("Error extracting and applying release: " . $e->getMessage());
+            return false;
         }
     }
 
@@ -716,80 +911,6 @@ class SystemUpdateController extends Controller
     }
 
     /**
-     * Extract migrations from the downloaded release and run them
-     * 
-     * @param string $version The version being updated to
-     * @return bool Whether the process was successful
-     */
-    private function extractAndApplyMigrations($version)
-    {
-        $downloadPath = config('self-update.repository_types.github.download_path', 'storage/app/github-releases');
-        $zipFile = "{$downloadPath}/{$version}.zip";
-        
-        if (!File::exists($zipFile)) {
-            Log::error("Update zip file not found: {$zipFile}");
-            return false;
-        }
-        
-        Log::info("Found update file: {$zipFile} (" . File::size($zipFile) . " bytes)");
-        
-        // Extract to a temporary directory
-        $extractPath = storage_path('app/update-extract');
-        if (File::exists($extractPath)) {
-            File::deleteDirectory($extractPath);
-        }
-        File::makeDirectory($extractPath, 0755, true);
-        
-        Log::info("Extracting to: {$extractPath}");
-        
-        try {
-            $zip = new \ZipArchive;
-            if ($zip->open($zipFile) === TRUE) {
-                // Get the folder name inside the zip (GitHub adds a folder with repo-version name)
-                $folderName = $zip->getNameIndex(0);
-                Log::info("Zip contains folder: {$folderName}");
-                
-                $zip->extractTo($extractPath);
-                $zip->close();
-                Log::info("Extraction complete");
-                
-                // Find all migration files in the extracted archive
-                $migrationSourcePath = $extractPath . '/' . $folderName . 'database/migrations/tenant';
-                
-                if (!File::exists($migrationSourcePath)) {
-                    Log::error("Migration directory not found in extracted update: {$migrationSourcePath}");
-                    return false;
-                }
-                
-                // Find all migration files in the extracted archive
-                $migrations = File::files($migrationSourcePath);
-                Log::info("Found " . count($migrations) . " tenant migrations in the update");
-                
-                // Copy the migrations to the application's migration directory
-                $targetPath = database_path('migrations/tenant');
-                foreach ($migrations as $migration) {
-                    $filename = $migration->getFilename();
-                    Log::info("Processing migration: {$filename}");
-                    File::copy($migration->getPathname(), $targetPath . '/' . $filename);
-                }
-                
-                // Run the migrations
-                Log::info("Running tenant migrations...");
-                Artisan::call('tenants:migrate', ['--force' => true]);
-                Log::info(Artisan::output());
-                
-                return true;
-            } else {
-                Log::error("Failed to open the zip file");
-                return false;
-            }
-        } catch (\Exception $e) {
-            Log::error("Error extracting and applying migrations: " . $e->getMessage());
-            return false;
-        }
-    }
-
-    /**
      * Download and restore a specific version's source code
      * 
      * @param string $version The version to restore
@@ -803,24 +924,24 @@ class SystemUpdateController extends Controller
             $vendor = $githubConfig['repository_vendor'];
             $repo = $githubConfig['repository_name'];
             $token = $githubConfig['private_access_token'];
-            $downloadPath = $githubConfig['download_path'];
             
-            if (empty($vendor) || empty($repo)) {
-                Log::warning("GitHub configuration missing vendor or repo name");
-                return false;
-            }
+            // Make sure we use a consistent download path
+            $downloadPath = storage_path('app/github-releases');
             
             // Ensure download directory exists
-            if (!File::exists(storage_path($downloadPath))) {
-                File::makeDirectory(storage_path($downloadPath), 0755, true);
+            if (!file_exists($downloadPath)) {
+                if (!mkdir($downloadPath, 0755, true)) {
+                    Log::error("Failed to create download directory: {$downloadPath}");
+                    return false;
+                }
             }
             
             // Setup the release download URL
             $downloadUrl = "https://github.com/{$vendor}/{$repo}/archive/refs/tags/{$version}.zip";
-            $zipFile = storage_path("{$downloadPath}/{$version}.zip");
+            $zipFile = $downloadPath . '/' . $version . '.zip';
             
             // Check if we already have the file downloaded
-            if (!File::exists($zipFile)) {
+            if (!file_exists($zipFile)) {
                 Log::info("Downloading source code for version {$version} from {$downloadUrl}");
                 
                 // Setup HTTP client with appropriate headers
@@ -836,37 +957,60 @@ class SystemUpdateController extends Controller
                 // Download the file
                 $response = $client->request('GET', $downloadUrl, [
                     'headers' => $headers,
-                    'sink' => $zipFile
+                    'sink' => $zipFile,
+                    'timeout' => config('self-update.download_timeout', 300)
                 ]);
                 
                 if ($response->getStatusCode() !== 200) {
                     Log::error("Failed to download version {$version}, HTTP status: " . $response->getStatusCode());
                     return false;
                 }
+                
+                if (!file_exists($zipFile)) {
+                    Log::error("File not found after download: {$zipFile}");
+                    return false;
+                }
             } else {
                 Log::info("Using previously downloaded file for version {$version}");
+            }
+            
+            // Verify that ZipArchive class exists
+            if (!class_exists('ZipArchive')) {
+                Log::error("ZipArchive class not found. PHP zip extension may not be installed.");
+                return false;
             }
             
             // Extract the downloaded zip file
             $extractPath = storage_path('app/rollback-extract');
             
             // Clean up existing extraction directory
-            if (File::exists($extractPath)) {
+            if (file_exists($extractPath)) {
                 File::deleteDirectory($extractPath);
             }
-            File::makeDirectory($extractPath, 0755, true);
+            
+            if (!File::makeDirectory($extractPath, 0755, true)) {
+                Log::error("Failed to create extraction directory: {$extractPath}");
+                return false;
+            }
             
             Log::info("Extracting {$zipFile} to {$extractPath}");
             
-            $zip = new \ZipArchive;
-            if ($zip->open($zipFile) !== true) {
-                Log::error("Failed to open the zip file: {$zipFile}");
+            $zip = new \ZipArchive();
+            $openResult = $zip->open($zipFile);
+            
+            if ($openResult !== true) {
+                Log::error("Failed to open zip file. Error code: " . $openResult);
                 return false;
             }
             
             // Extract all files
-            $zip->extractTo($extractPath);
+            $extractResult = $zip->extractTo($extractPath);
             $zip->close();
+            
+            if (!$extractResult) {
+                Log::error("Failed to extract zip file");
+                return false;
+            }
             
             // Determine the root directory inside the zip (typically repo-version format)
             $directories = File::directories($extractPath);
