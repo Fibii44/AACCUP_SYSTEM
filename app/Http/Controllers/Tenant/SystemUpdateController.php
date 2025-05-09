@@ -184,9 +184,9 @@ class SystemUpdateController extends Controller
             // This is more reliable than using the package's download mechanism
             try {
                 Log::info("Attempting direct download of version {$newVersion}");
-                $downloadSuccess = $this->downloadReleaseZip($newVersion);
+                $downloadResult = $this->downloadReleaseZip($newVersion);
                 
-                if (!$downloadSuccess) {
+                if (!$downloadResult || (is_array($downloadResult) && !$downloadResult['success'])) {
                     Log::error("Failed to download the release ZIP for version {$newVersion}");
                     return redirect()->route('tenant.system-updates.index')
                         ->with('error', "Failed to download update files. Please try again.");
@@ -376,15 +376,37 @@ class SystemUpdateController extends Controller
             $repo = $githubConfig['repository_name'];
             $token = $githubConfig['private_access_token'];
             
-            // Make sure we have the proper download path
-            $downloadPath = storage_path('app/github-releases');
+            // Try multiple download paths - handle both tenant and non-tenant contexts
+            $possiblePaths = [
+                storage_path('app/github-releases'),
+                storage_path('tenantitdept/app/github-releases')
+            ];
             
-            // Create download directory if it doesn't exist
-            if (!file_exists($downloadPath)) {
-                if (!mkdir($downloadPath, 0755, true)) {
-                    Log::error("Failed to create download directory: {$downloadPath}");
-                    return false;
+            // Check if any of the directory paths already exist
+            $downloadPath = null;
+            foreach ($possiblePaths as $path) {
+                if (file_exists($path)) {
+                    $downloadPath = $path;
+                    Log::info("Using existing download directory: {$downloadPath}");
+                    break;
                 }
+            }
+            
+            // If none exists, try to create each until one succeeds
+            if ($downloadPath === null) {
+                foreach ($possiblePaths as $path) {
+                    if (mkdir($path, 0755, true)) {
+                        $downloadPath = $path;
+                        Log::info("Created download directory: {$downloadPath}");
+                        break;
+                    }
+                }
+            }
+            
+            // If we still don't have a path, use the first one as a last resort
+            if ($downloadPath === null) {
+                $downloadPath = $possiblePaths[0];
+                Log::warning("Using fallback download path: {$downloadPath}");
             }
             
             // Setup the release download URL
@@ -429,7 +451,12 @@ class SystemUpdateController extends Controller
             }
             
             Log::info("Successfully downloaded {$version}.zip ({$fileSize} bytes)");
-            return true;
+            
+            // Return both the success status and the path where the file was saved
+            return [
+                'success' => true,
+                'path' => $downloadPath
+            ];
             
         } catch (\Exception $e) {
             Log::error("Error downloading release zip: " . $e->getMessage());
@@ -446,12 +473,28 @@ class SystemUpdateController extends Controller
     private function extractAndApplyRelease($version)
     {
         try {
-            // Make sure we have the proper download path
-            $downloadPath = storage_path('app/github-releases');
-            $zipFile = $downloadPath . '/' . $version . '.zip';
+            // Try to find the ZIP file in possible locations
+            $possiblePaths = [
+                storage_path('app/github-releases'),
+                storage_path('tenantitdept/app/github-releases')
+            ];
             
-            if (!file_exists($zipFile)) {
-                Log::error("Update zip file not found: {$zipFile}");
+            $zipFile = null;
+            $downloadPath = null;
+            
+            // Check each possible location for the zip file
+            foreach ($possiblePaths as $path) {
+                $testPath = $path . '/' . $version . '.zip';
+                if (file_exists($testPath)) {
+                    $zipFile = $testPath;
+                    $downloadPath = $path;
+                    Log::info("Found update zip file at: {$zipFile}");
+                    break;
+                }
+            }
+            
+            if (!$zipFile) {
+                Log::error("Update zip file not found in any of the possible locations");
                 return false;
             }
             
@@ -461,8 +504,11 @@ class SystemUpdateController extends Controller
                 return false;
             }
             
-            // Extract to a temporary directory
-            $extractPath = storage_path('app/update-extract');
+            // Use the same base path for extract directory
+            $extractBasePath = dirname($downloadPath);
+            $extractPath = $extractBasePath . '/update-extract';
+            
+            // Clean up existing extraction directory
             if (file_exists($extractPath)) {
                 File::deleteDirectory($extractPath);
             }
@@ -925,15 +971,37 @@ class SystemUpdateController extends Controller
             $repo = $githubConfig['repository_name'];
             $token = $githubConfig['private_access_token'];
             
-            // Make sure we use a consistent download path
-            $downloadPath = storage_path('app/github-releases');
+            // Try multiple download paths - handle both tenant and non-tenant contexts
+            $possiblePaths = [
+                storage_path('app/github-releases'),
+                storage_path('tenantitdept/app/github-releases')
+            ];
             
-            // Ensure download directory exists
-            if (!file_exists($downloadPath)) {
-                if (!mkdir($downloadPath, 0755, true)) {
-                    Log::error("Failed to create download directory: {$downloadPath}");
-                    return false;
+            // Check if any of the directory paths already exist
+            $downloadPath = null;
+            foreach ($possiblePaths as $path) {
+                if (file_exists($path)) {
+                    $downloadPath = $path;
+                    Log::info("Using existing download directory: {$downloadPath}");
+                    break;
                 }
+            }
+            
+            // If none exists, try to create each until one succeeds
+            if ($downloadPath === null) {
+                foreach ($possiblePaths as $path) {
+                    if (mkdir($path, 0755, true)) {
+                        $downloadPath = $path;
+                        Log::info("Created download directory: {$downloadPath}");
+                        break;
+                    }
+                }
+            }
+            
+            // If we still don't have a path, use the first one as a last resort
+            if ($downloadPath === null) {
+                $downloadPath = $possiblePaths[0];
+                Log::warning("Using fallback download path: {$downloadPath}");
             }
             
             // Setup the release download URL
@@ -981,7 +1049,9 @@ class SystemUpdateController extends Controller
             }
             
             // Extract the downloaded zip file
-            $extractPath = storage_path('app/rollback-extract');
+            // Use the same base path for extract directory
+            $extractBasePath = dirname($downloadPath);
+            $extractPath = $extractBasePath . '/rollback-extract';
             
             // Clean up existing extraction directory
             if (file_exists($extractPath)) {
