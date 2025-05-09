@@ -21,7 +21,6 @@ use App\Http\Middleware\CheckUserStatus;
 use App\Http\Controllers\Tenant\InstrumentController;
 use App\Http\Controllers\Tenant\UploadController;
 use App\Http\Controllers\Tenant\ProfileController;
-use App\Http\Controllers\Tenant\VersionTestingController;
 
 
 /*
@@ -157,8 +156,6 @@ Route::middleware([
         // Upload routes
         Route::get('/indicators/{indicator}/uploads', [UploadController::class, 'index'])->name('tenant.uploads.index');
         Route::post('/indicators/{indicator}/uploads', [UploadController::class, 'store'])->name('tenant.uploads.store');
-
-        // Version Testing routes
-        Route::get('/version-testing', [VersionTestingController::class, 'index'])->name('tenant.version-testing.index');
+       
     });
 });

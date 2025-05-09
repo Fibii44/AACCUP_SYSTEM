@@ -379,7 +379,10 @@ class SystemUpdateController extends Controller
             // Try multiple download paths - handle both tenant and non-tenant contexts
             $possiblePaths = [
                 storage_path('app/github-releases'),
-                storage_path('tenantitdept/app/github-releases')
+                storage_path('tenantitdept/app/github-releases'),
+                storage_path('tenantitdept/storage/app/github-releases'), // Nested storage path
+                base_path('storage/tenantitdept/storage/app/github-releases'), // Absolute path with nested storage
+                base_path('storage/tenantitdept/app/github-releases') // Alternate tenant path
             ];
             
             // Check if any of the directory paths already exist
@@ -395,10 +398,16 @@ class SystemUpdateController extends Controller
             // If none exists, try to create each until one succeeds
             if ($downloadPath === null) {
                 foreach ($possiblePaths as $path) {
-                    if (mkdir($path, 0755, true)) {
-                        $downloadPath = $path;
-                        Log::info("Created download directory: {$downloadPath}");
-                        break;
+                    try {
+                        if (!file_exists($path)) {
+                            if (mkdir($path, 0755, true)) {
+                                $downloadPath = $path;
+                                Log::info("Created download directory: {$downloadPath}");
+                                break;
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning("Failed to create directory {$path}: " . $e->getMessage());
                     }
                 }
             }
@@ -408,6 +417,10 @@ class SystemUpdateController extends Controller
                 $downloadPath = $possiblePaths[0];
                 Log::warning("Using fallback download path: {$downloadPath}");
             }
+            
+            // Log all possible paths for debugging
+            Log::info("All possible download paths checked: " . implode(', ', $possiblePaths));
+            Log::info("Selected download path: {$downloadPath}");
             
             // Setup the release download URL
             $downloadUrl = "https://github.com/{$vendor}/{$repo}/archive/refs/tags/{$version}.zip";
@@ -476,7 +489,10 @@ class SystemUpdateController extends Controller
             // Try to find the ZIP file in possible locations
             $possiblePaths = [
                 storage_path('app/github-releases'),
-                storage_path('tenantitdept/app/github-releases')
+                storage_path('tenantitdept/app/github-releases'),
+                storage_path('tenantitdept/storage/app/github-releases'), // Nested storage path
+                base_path('storage/tenantitdept/storage/app/github-releases'), // Absolute path with nested storage
+                base_path('storage/tenantitdept/app/github-releases') // Alternate tenant path
             ];
             
             $zipFile = null;
@@ -495,12 +511,28 @@ class SystemUpdateController extends Controller
             
             if (!$zipFile) {
                 Log::error("Update zip file not found in any of the possible locations");
+                Log::error("Checked the following paths:");
+                foreach ($possiblePaths as $path) {
+                    Log::error(" - {$path}/{$version}.zip");
+                }
                 return false;
             }
             
-            // Verify that ZipArchive class exists
-            if (!class_exists('ZipArchive')) {
-                Log::error("ZipArchive class not found. PHP zip extension may not be installed.");
+            // Check file size to ensure it's a valid download
+            $fileSize = filesize($zipFile);
+            Log::info("ZIP file size: {$fileSize} bytes");
+            
+            if ($fileSize < 1000) { // Less than 1KB is definitely wrong
+                Log::error("ZIP file seems too small ({$fileSize} bytes), likely corrupted");
+                return false;
+            }
+            
+            // Check available disk space
+            $freeSpace = disk_free_space(dirname($zipFile));
+            Log::info("Free disk space: {$freeSpace} bytes");
+            
+            if ($freeSpace < $fileSize * 3) { // Need at least 3x the ZIP size for extraction
+                Log::error("Not enough disk space for extraction. Needed: " . ($fileSize * 3) . ", Available: {$freeSpace}");
                 return false;
             }
             
@@ -510,34 +542,125 @@ class SystemUpdateController extends Controller
             
             // Clean up existing extraction directory
             if (file_exists($extractPath)) {
-                File::deleteDirectory($extractPath);
+                Log::info("Removing existing extraction directory: {$extractPath}");
+                if (!File::deleteDirectory($extractPath)) {
+                    Log::error("Failed to delete existing extraction directory. Check permissions.");
+                    return false;
+                }
             }
             
             if (!File::makeDirectory($extractPath, 0755, true)) {
-                Log::error("Failed to create extraction directory: {$extractPath}");
+                Log::error("Failed to create extraction directory: {$extractPath} - Check permissions");
                 return false;
             }
             
             Log::info("Extracting {$zipFile} to {$extractPath}");
             
-            $zip = new \ZipArchive();
-            $openResult = $zip->open($zipFile);
+            // EXTRACTION METHOD 1: Try ZipArchive first
+            $extractionSuccess = false;
             
-            if ($openResult !== true) {
-                Log::error("Failed to open zip file. Error code: " . $openResult);
+            if (class_exists('ZipArchive')) {
+                try {
+                    Log::info("Attempting extraction with ZipArchive");
+                    $zip = new \ZipArchive();
+                    $openResult = $zip->open($zipFile);
+                    
+                    if ($openResult !== true) {
+                        Log::error("Failed to open zip file with ZipArchive. Error code: {$openResult}");
+                    } else {
+                        Log::info("ZipArchive opened successfully. Found " . $zip->numFiles . " files in archive");
+                        
+                        // Extract the zip file
+                        $extractResult = $zip->extractTo($extractPath);
+                        $zip->close();
+                        
+                        if ($extractResult) {
+                            Log::info("ZipArchive extraction successful");
+                            $extractionSuccess = true;
+                        } else {
+                            Log::error("ZipArchive extraction failed");
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::error("ZipArchive extraction error: " . $e->getMessage());
+                }
+            } else {
+                Log::warning("ZipArchive not available, will try alternative extraction methods");
+            }
+            
+            // EXTRACTION METHOD 2: If ZipArchive failed, try PharData
+            if (!$extractionSuccess && class_exists('PharData')) {
+                try {
+                    Log::info("Attempting extraction with PharData");
+                    
+                    // Temporarily rename zip to tar for PharData to work
+                    $tempTarPath = $zipFile . '.tar';
+                    if (copy($zipFile, $tempTarPath)) {
+                        $archive = new \PharData($tempTarPath);
+                        $archive->extractTo($extractPath, null, true); // Overwrite
+                        unlink($tempTarPath);
+                        
+                        Log::info("PharData extraction appears successful");
+                        $extractionSuccess = true;
+                    } else {
+                        Log::error("Failed to create temporary file for PharData extraction");
+                    }
+                } catch (\Exception $e) {
+                    Log::error("PharData extraction error: " . $e->getMessage());
+                }
+            }
+            
+            // EXTRACTION METHOD 3: Try system unzip command
+            if (!$extractionSuccess) {
+                try {
+                    Log::info("Attempting extraction with system unzip command");
+                    
+                    // Check if unzip command exists
+                    $unzipExists = false;
+                    
+                    if (function_exists('exec')) {
+                        $unzipExists = trim(exec('which unzip'));
+                    }
+                    
+                    if ($unzipExists) {
+                        $command = "unzip -o {$zipFile} -d {$extractPath} 2>&1";
+                        Log::info("Running command: {$command}");
+                        
+                        $output = [];
+                        $returnVar = 0;
+                        exec($command, $output, $returnVar);
+                        
+                        Log::info("Unzip command output: " . implode("\n", $output));
+                        
+                        if ($returnVar === 0) {
+                            Log::info("System unzip extraction successful");
+                            $extractionSuccess = true;
+                        } else {
+                            Log::error("System unzip extraction failed with code {$returnVar}");
+                        }
+                    } else {
+                        Log::warning("System unzip command not available");
+                    }
+                } catch (\Exception $e) {
+                    Log::error("System unzip extraction error: " . $e->getMessage());
+                }
+            }
+            
+            if (!$extractionSuccess) {
+                Log::error("All extraction methods failed. Cannot proceed with update.");
                 return false;
             }
             
-            // Extract the zip file
-            $extractResult = $zip->extractTo($extractPath);
-            $zip->close();
+            // Verify extraction was successful by checking for files
+            $extractedFiles = File::allFiles($extractPath);
+            $extractedFileCount = count($extractedFiles);
             
-            if (!$extractResult) {
-                Log::error("Failed to extract zip file");
+            Log::info("Extracted file count: {$extractedFileCount}");
+            
+            if ($extractedFileCount === 0) {
+                Log::error("Extraction appeared to succeed but no files were extracted");
                 return false;
             }
-            
-            Log::info("Successfully extracted zip file");
             
             // Determine the root directory inside the zip (typically repo-version format)
             $directories = File::directories($extractPath);
@@ -549,12 +672,44 @@ class SystemUpdateController extends Controller
             $extractedRoot = $directories[0];
             Log::info("Extracted files to: {$extractedRoot}");
             
+            // Verify the extracted directory has expected structure
+            $isValidExtraction = false;
+            
+            // Check for key files/directories that should exist in any Laravel project
+            $validationPaths = [
+                'app',
+                'bootstrap',
+                'config',
+                'database',
+                'public',
+                'routes',
+                'composer.json'
+            ];
+            
+            foreach ($validationPaths as $path) {
+                if (file_exists($extractedRoot . '/' . $path)) {
+                    $isValidExtraction = true;
+                    break;
+                }
+            }
+            
+            if (!$isValidExtraction) {
+                Log::error("Extracted directory does not appear to be a valid Laravel project");
+                Log::error("Files in extracted root: " . implode(', ', array_map('basename', glob($extractedRoot . '/*'))));
+                return false;
+            }
+            
             // Prepare list of directories to exclude from replacement
             $excludeDirectories = config('self-update.exclude_folders', []);
             Log::info("Excluding directories: " . implode(', ', $excludeDirectories));
             
             // Copy files from the extracted directory to the app root, skipping excluded directories
-            $this->copyDirectoryContents($extractedRoot, base_path(), $excludeDirectories);
+            $copySuccess = $this->copyDirectoryContents($extractedRoot, base_path(), $excludeDirectories);
+            
+            if (!$copySuccess) {
+                Log::error("Failed to copy extracted files to application directory");
+                return false;
+            }
             
             // Clean up
             Log::info("Cleaning up temporary files");
@@ -563,6 +718,87 @@ class SystemUpdateController extends Controller
             return true;
         } catch (\Exception $e) {
             Log::error("Error extracting and applying release: " . $e->getMessage());
+            Log::error("Stack trace: " . $e->getTraceAsString());
+            return false;
+        }
+    }
+
+    /**
+     * Copy directory contents recursively, excluding specified directories
+     * 
+     * @param string $source Source directory
+     * @param string $destination Destination directory 
+     * @param array $excludeDirectories Directories to exclude
+     * @return bool Whether the copy operation was successful
+     */
+    private function copyDirectoryContents($source, $destination, $excludeDirectories = [])
+    {
+        try {
+            // Normalize paths to ensure consistent comparisons
+            $source = rtrim($source, '/\\') . DIRECTORY_SEPARATOR;
+            $destination = rtrim($destination, '/\\') . DIRECTORY_SEPARATOR;
+            
+            Log::info("Copying files from {$source} to {$destination}");
+            
+            // Get all items from the source directory
+            $items = File::allFiles($source);
+            $totalFiles = count($items);
+            $copiedFiles = 0;
+            $skippedFiles = 0;
+            $errorFiles = 0;
+            
+            Log::info("Found {$totalFiles} files to copy");
+            
+            foreach ($items as $item) {
+                // Get relative path from the source root
+                $relativePath = str_replace($source, '', $item->getPathname());
+                $targetPath = $destination . $relativePath;
+                
+                // Check if this file is in an excluded directory
+                $shouldExclude = false;
+                foreach ($excludeDirectories as $excludeDir) {
+                    if (strpos($relativePath, $excludeDir . DIRECTORY_SEPARATOR) === 0 || $relativePath === $excludeDir) {
+                        $shouldExclude = true;
+                        break;
+                    }
+                }
+                
+                // Skip if it's in an excluded directory
+                if ($shouldExclude) {
+                    // Log::info("Skipping excluded file: {$relativePath}");
+                    $skippedFiles++;
+                    continue;
+                }
+                
+                // Create target directory if it doesn't exist
+                $targetDir = dirname($targetPath);
+                if (!file_exists($targetDir)) {
+                    if (!File::makeDirectory($targetDir, 0755, true)) {
+                        Log::error("Failed to create directory: {$targetDir}");
+                        $errorFiles++;
+                        continue;
+                    }
+                }
+                
+                // Copy the file
+                try {
+                    if (File::copy($item->getPathname(), $targetPath)) {
+                        $copiedFiles++;
+                    } else {
+                        Log::warning("Failed to copy {$relativePath}");
+                        $errorFiles++;
+                    }
+                } catch (\Exception $e) {
+                    Log::warning("Failed to copy {$relativePath}: " . $e->getMessage());
+                    $errorFiles++;
+                }
+            }
+            
+            Log::info("Copy operation summary: {$copiedFiles} copied, {$skippedFiles} skipped, {$errorFiles} errors");
+            
+            return $errorFiles === 0; // Success only if there were no errors
+        } catch (\Exception $e) {
+            Log::error("Error in copyDirectoryContents: " . $e->getMessage());
             return false;
         }
     }
@@ -974,7 +1210,10 @@ class SystemUpdateController extends Controller
             // Try multiple download paths - handle both tenant and non-tenant contexts
             $possiblePaths = [
                 storage_path('app/github-releases'),
-                storage_path('tenantitdept/app/github-releases')
+                storage_path('tenantitdept/app/github-releases'),
+                storage_path('tenantitdept/storage/app/github-releases'), // Nested storage path
+                base_path('storage/tenantitdept/storage/app/github-releases'), // Absolute path with nested storage
+                base_path('storage/tenantitdept/app/github-releases') // Alternate tenant path
             ];
             
             // Check if any of the directory paths already exist
@@ -990,10 +1229,16 @@ class SystemUpdateController extends Controller
             // If none exists, try to create each until one succeeds
             if ($downloadPath === null) {
                 foreach ($possiblePaths as $path) {
-                    if (mkdir($path, 0755, true)) {
-                        $downloadPath = $path;
-                        Log::info("Created download directory: {$downloadPath}");
-                        break;
+                    try {
+                        if (!file_exists($path)) {
+                            if (mkdir($path, 0755, true)) {
+                                $downloadPath = $path;
+                                Log::info("Created download directory: {$downloadPath}");
+                                break;
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning("Failed to create directory {$path}: " . $e->getMessage());
                     }
                 }
             }
@@ -1003,6 +1248,10 @@ class SystemUpdateController extends Controller
                 $downloadPath = $possiblePaths[0];
                 Log::warning("Using fallback download path: {$downloadPath}");
             }
+            
+            // Log all possible paths for debugging
+            Log::info("All possible download paths checked: " . implode(', ', $possiblePaths));
+            Log::info("Selected download path: {$downloadPath}");
             
             // Setup the release download URL
             $downloadUrl = "https://github.com/{$vendor}/{$repo}/archive/refs/tags/{$version}.zip";
@@ -1107,59 +1356,6 @@ class SystemUpdateController extends Controller
         } catch (\Exception $e) {
             Log::error("Error downloading and restoring version {$version}: " . $e->getMessage());
             return false;
-        }
-    }
-    
-    /**
-     * Copy directory contents recursively, excluding specified directories
-     * 
-     * @param string $source Source directory
-     * @param string $destination Destination directory 
-     * @param array $excludeDirectories Directories to exclude
-     * @return void
-     */
-    private function copyDirectoryContents($source, $destination, $excludeDirectories = [])
-    {
-        // Normalize paths to ensure consistent comparisons
-        $source = rtrim($source, '/\\') . DIRECTORY_SEPARATOR;
-        $destination = rtrim($destination, '/\\') . DIRECTORY_SEPARATOR;
-        
-        // Get all items from the source directory
-        $items = File::allFiles($source);
-        
-        foreach ($items as $item) {
-            // Get relative path from the source root
-            $relativePath = str_replace($source, '', $item->getPathname());
-            $targetPath = $destination . $relativePath;
-            
-            // Check if this file is in an excluded directory
-            $shouldExclude = false;
-            foreach ($excludeDirectories as $excludeDir) {
-                if (strpos($relativePath, $excludeDir . DIRECTORY_SEPARATOR) === 0 || $relativePath === $excludeDir) {
-                    $shouldExclude = true;
-                    break;
-                }
-            }
-            
-            // Skip if it's in an excluded directory
-            if ($shouldExclude) {
-                Log::info("Skipping excluded file: {$relativePath}");
-                continue;
-            }
-            
-            // Create target directory if it doesn't exist
-            $targetDir = dirname($targetPath);
-            if (!File::exists($targetDir)) {
-                File::makeDirectory($targetDir, 0755, true);
-            }
-            
-            // Copy the file
-            try {
-                File::copy($item->getPathname(), $targetPath);
-                // Log::debug("Copied: {$relativePath}");
-            } catch (\Exception $e) {
-                Log::warning("Failed to copy {$relativePath}: " . $e->getMessage());
-            }
         }
     }
 } 
