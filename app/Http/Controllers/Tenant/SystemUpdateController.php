@@ -481,9 +481,10 @@ class SystemUpdateController extends Controller
      * Extract and apply a downloaded release
      * 
      * @param string $version The version to extract and apply
+     * @param bool $isRollback Whether this is a rollback operation
      * @return bool Whether the extraction and application was successful
      */
-    private function extractAndApplyRelease($version)
+    private function extractAndApplyRelease($version, $isRollback = false)
     {
         try {
             // Try to find the ZIP file in possible locations
@@ -704,7 +705,7 @@ class SystemUpdateController extends Controller
             Log::info("Excluding directories: " . implode(', ', $excludeDirectories));
             
             // Copy files from the extracted directory to the app root, skipping excluded directories
-            $copySuccess = $this->copyDirectoryContents($extractedRoot, base_path(), $excludeDirectories);
+            $copySuccess = $this->copyDirectoryContents($extractedRoot, base_path(), $excludeDirectories, $isRollback);
             
             if (!$copySuccess) {
                 Log::error("Failed to copy extracted files to application directory");
@@ -729,9 +730,10 @@ class SystemUpdateController extends Controller
      * @param string $source Source directory
      * @param string $destination Destination directory 
      * @param array $excludeDirectories Directories to exclude
+     * @param bool $isRollback Whether this is a rollback operation
      * @return bool Whether the copy operation was successful
      */
-    private function copyDirectoryContents($source, $destination, $excludeDirectories = [])
+    private function copyDirectoryContents($source, $destination, $excludeDirectories = [], $isRollback = false)
     {
         try {
             // Normalize paths to ensure consistent comparisons
@@ -749,10 +751,14 @@ class SystemUpdateController extends Controller
             
             Log::info("Found {$totalFiles} files to copy");
             
+            // Track source files for rollback file removal
+            $sourceFiles = [];
+            
             foreach ($items as $item) {
                 // Get relative path from the source root
                 $relativePath = str_replace($source, '', $item->getPathname());
                 $targetPath = $destination . $relativePath;
+                $sourceFiles[] = $relativePath;
                 
                 // Check if this file is in an excluded directory
                 $shouldExclude = false;
@@ -796,11 +802,130 @@ class SystemUpdateController extends Controller
             
             Log::info("Copy operation summary: {$copiedFiles} copied, {$skippedFiles} skipped, {$errorFiles} errors");
             
+            // If this is a rollback, remove files that don't exist in the source version
+            if ($isRollback) {
+                Log::info("Rollback: Checking for files to remove");
+                $this->removeNewFilesForRollback($destination, $source, $sourceFiles, $excludeDirectories);
+            }
+            
             return $errorFiles === 0; // Success only if there were no errors
         } catch (\Exception $e) {
             Log::error("Error in copyDirectoryContents: " . $e->getMessage());
             return false;
         }
+    }
+    
+    /**
+     * Remove files that exist in the destination but not in the source during a rollback
+     * 
+     * @param string $destination The destination directory (app root)
+     * @param string $source The source directory (extracted rollback version)
+     * @param array $sourceFiles List of relative file paths in the source
+     * @param array $excludeDirectories Directories to exclude
+     * @return void
+     */
+    private function removeNewFilesForRollback($destination, $source, $sourceFiles, $excludeDirectories)
+    {
+        try {
+            // Get all files in the destination
+            $destFiles = File::allFiles($destination);
+            $filesRemoved = 0;
+            $dirsRemoved = 0;
+            
+            // Create a lookup array for faster checks
+            $sourceFilesLookup = array_flip($sourceFiles);
+            
+            // Process each destination file
+            foreach ($destFiles as $destFile) {
+                $relativePath = str_replace($destination, '', $destFile->getPathname());
+                
+                // Skip excluded directories
+                $shouldExclude = false;
+                foreach ($excludeDirectories as $excludeDir) {
+                    if (strpos($relativePath, $excludeDir . DIRECTORY_SEPARATOR) === 0 || $relativePath === $excludeDir) {
+                        $shouldExclude = true;
+                        break;
+                    }
+                }
+                
+                if ($shouldExclude) {
+                    continue;
+                }
+                
+                // Check if this file exists in the source
+                if (!isset($sourceFilesLookup[$relativePath]) && !file_exists($source . $relativePath)) {
+                    // This file doesn't exist in the rollback version, so delete it
+                    try {
+                        if (File::delete($destFile->getPathname())) {
+                            Log::info("Removed file: {$relativePath}");
+                            $filesRemoved++;
+                        } else {
+                            Log::warning("Failed to remove file: {$relativePath}");
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning("Error removing file {$relativePath}: " . $e->getMessage());
+                    }
+                }
+            }
+            
+            // Now remove empty directories that might have been created in the update
+            $this->removeEmptyDirectories($destination, $excludeDirectories);
+            
+            Log::info("Rollback cleanup: Removed {$filesRemoved} files that didn't exist in the previous version");
+        } catch (\Exception $e) {
+            Log::error("Error removing new files during rollback: " . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Recursively remove empty directories
+     * 
+     * @param string $directory The directory to check
+     * @param array $excludeDirectories Directories to exclude
+     * @return int Number of directories removed
+     */
+    private function removeEmptyDirectories($directory, $excludeDirectories)
+    {
+        $dirsRemoved = 0;
+        
+        // Get all subdirectories
+        $dirs = glob($directory . '/*', GLOB_ONLYDIR);
+        
+        foreach ($dirs as $dir) {
+            $relativeDir = str_replace(base_path() . DIRECTORY_SEPARATOR, '', $dir);
+            
+            // Skip excluded directories
+            $shouldExclude = false;
+            foreach ($excludeDirectories as $excludeDir) {
+                if (strpos($relativeDir, $excludeDir) === 0 || $relativeDir === $excludeDir) {
+                    $shouldExclude = true;
+                    break;
+                }
+            }
+            
+            if ($shouldExclude) {
+                continue;
+            }
+            
+            // Recursively process subdirectories
+            $subDirsRemoved = $this->removeEmptyDirectories($dir, $excludeDirectories);
+            $dirsRemoved += $subDirsRemoved;
+            
+            // Check if this directory is now empty
+            $files = glob($dir . '/*');
+            if (empty($files)) {
+                try {
+                    if (rmdir($dir)) {
+                        Log::info("Removed empty directory: {$relativeDir}");
+                        $dirsRemoved++;
+                    }
+                } catch (\Exception $e) {
+                    Log::warning("Failed to remove empty directory {$relativeDir}: " . $e->getMessage());
+                }
+            }
+        }
+        
+        return $dirsRemoved;
     }
 
     /**
@@ -828,7 +953,7 @@ class SystemUpdateController extends Controller
                 Log::info("Downloading and extracting source for version {$previousVersion}");
                 
                 // First try using the enhanced extraction method from the update process
-                $sourceRestored = $this->extractAndApplyRelease($previousVersion);
+                $sourceRestored = $this->extractAndApplyRelease($previousVersion, true);
                 
                 // If that fails, try the dedicated rollback method
                 if (!$sourceRestored) {
@@ -1505,7 +1630,7 @@ class SystemUpdateController extends Controller
             Log::info("Excluding directories: " . implode(', ', $excludeDirectories));
             
             // Copy files from the extracted directory to the app root, skipping excluded directories
-            $copySuccess = $this->copyDirectoryContents($extractedRoot, base_path(), $excludeDirectories);
+            $copySuccess = $this->copyDirectoryContents($extractedRoot, base_path(), $excludeDirectories, true);
             
             if (!$copySuccess) {
                 Log::error("Failed to copy extracted files to application directory");
