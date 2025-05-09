@@ -157,7 +157,5 @@ Route::middleware([
         // Upload routes
         Route::get('/indicators/{indicator}/uploads', [UploadController::class, 'index'])->name('tenant.uploads.index');
         Route::post('/indicators/{indicator}/uploads', [UploadController::class, 'store'])->name('tenant.uploads.store');
-
-        
     });
 });
