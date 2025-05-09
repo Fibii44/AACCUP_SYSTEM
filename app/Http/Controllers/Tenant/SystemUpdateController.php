@@ -1327,9 +1327,12 @@ class SystemUpdateController extends Controller
                 Log::info("Using previously downloaded file for version {$version}");
             }
             
-            // Verify that ZipArchive class exists
-            if (!class_exists('ZipArchive')) {
-                Log::error("ZipArchive class not found. PHP zip extension may not be installed.");
+            // Check file size to ensure it's a valid download
+            $fileSize = filesize($zipFile);
+            Log::info("ZIP file size: {$fileSize} bytes");
+            
+            if ($fileSize < 1000) { // Less than 1KB is definitely wrong
+                Log::error("ZIP file seems too small ({$fileSize} bytes), likely corrupted");
                 return false;
             }
             
@@ -1340,7 +1343,11 @@ class SystemUpdateController extends Controller
             
             // Clean up existing extraction directory
             if (file_exists($extractPath)) {
-                File::deleteDirectory($extractPath);
+                Log::info("Removing existing extraction directory: {$extractPath}");
+                if (!File::deleteDirectory($extractPath)) {
+                    Log::error("Failed to delete existing extraction directory. Check permissions.");
+                    return false;
+                }
             }
             
             if (!File::makeDirectory($extractPath, 0755, true)) {
@@ -1350,20 +1357,109 @@ class SystemUpdateController extends Controller
             
             Log::info("Extracting {$zipFile} to {$extractPath}");
             
-            $zip = new \ZipArchive();
-            $openResult = $zip->open($zipFile);
+            // EXTRACTION METHOD 1: Try ZipArchive first
+            $extractionSuccess = false;
             
-            if ($openResult !== true) {
-                Log::error("Failed to open zip file. Error code: " . $openResult);
+            if (class_exists('ZipArchive')) {
+                try {
+                    Log::info("Attempting extraction with ZipArchive");
+                    $zip = new \ZipArchive();
+                    $openResult = $zip->open($zipFile);
+                    
+                    if ($openResult !== true) {
+                        Log::error("Failed to open zip file with ZipArchive. Error code: {$openResult}");
+                    } else {
+                        Log::info("ZipArchive opened successfully. Found " . $zip->numFiles . " files in archive");
+                        
+                        // Extract the zip file
+                        $extractResult = $zip->extractTo($extractPath);
+                        $zip->close();
+                        
+                        if ($extractResult) {
+                            Log::info("ZipArchive extraction successful");
+                            $extractionSuccess = true;
+                        } else {
+                            Log::error("ZipArchive extraction failed");
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::error("ZipArchive extraction error: " . $e->getMessage());
+                }
+            } else {
+                Log::warning("ZipArchive not available, will try alternative extraction methods");
+            }
+            
+            // EXTRACTION METHOD 2: If ZipArchive failed, try PharData
+            if (!$extractionSuccess && class_exists('PharData')) {
+                try {
+                    Log::info("Attempting extraction with PharData");
+                    
+                    // Temporarily rename zip to tar for PharData to work
+                    $tempTarPath = $zipFile . '.tar';
+                    if (copy($zipFile, $tempTarPath)) {
+                        $archive = new \PharData($tempTarPath);
+                        $archive->extractTo($extractPath, null, true); // Overwrite
+                        unlink($tempTarPath);
+                        
+                        Log::info("PharData extraction appears successful");
+                        $extractionSuccess = true;
+                    } else {
+                        Log::error("Failed to create temporary file for PharData extraction");
+                    }
+                } catch (\Exception $e) {
+                    Log::error("PharData extraction error: " . $e->getMessage());
+                }
+            }
+            
+            // EXTRACTION METHOD 3: Try system unzip command
+            if (!$extractionSuccess) {
+                try {
+                    Log::info("Attempting extraction with system unzip command");
+                    
+                    // Check if unzip command exists
+                    $unzipExists = false;
+                    
+                    if (function_exists('exec')) {
+                        $unzipExists = trim(exec('which unzip'));
+                    }
+                    
+                    if ($unzipExists) {
+                        $command = "unzip -o {$zipFile} -d {$extractPath} 2>&1";
+                        Log::info("Running command: {$command}");
+                        
+                        $output = [];
+                        $returnVar = 0;
+                        exec($command, $output, $returnVar);
+                        
+                        Log::info("Unzip command output: " . implode("\n", $output));
+                        
+                        if ($returnVar === 0) {
+                            Log::info("System unzip extraction successful");
+                            $extractionSuccess = true;
+                        } else {
+                            Log::error("System unzip extraction failed with code {$returnVar}");
+                        }
+                    } else {
+                        Log::warning("System unzip command not available");
+                    }
+                } catch (\Exception $e) {
+                    Log::error("System unzip extraction error: " . $e->getMessage());
+                }
+            }
+            
+            if (!$extractionSuccess) {
+                Log::error("All extraction methods failed. Cannot proceed with rollback.");
                 return false;
             }
             
-            // Extract all files
-            $extractResult = $zip->extractTo($extractPath);
-            $zip->close();
+            // Verify extraction was successful by checking for files
+            $extractedFiles = File::allFiles($extractPath);
+            $extractedFileCount = count($extractedFiles);
             
-            if (!$extractResult) {
-                Log::error("Failed to extract zip file");
+            Log::info("Extracted file count: {$extractedFileCount}");
+            
+            if ($extractedFileCount === 0) {
+                Log::error("Extraction appeared to succeed but no files were extracted");
                 return false;
             }
             
@@ -1377,12 +1473,44 @@ class SystemUpdateController extends Controller
             $extractedRoot = $directories[0];
             Log::info("Extracted files to: {$extractedRoot}");
             
+            // Verify the extracted directory has expected structure
+            $isValidExtraction = false;
+            
+            // Check for key files/directories that should exist in any Laravel project
+            $validationPaths = [
+                'app',
+                'bootstrap',
+                'config',
+                'database',
+                'public',
+                'routes',
+                'composer.json'
+            ];
+            
+            foreach ($validationPaths as $path) {
+                if (file_exists($extractedRoot . '/' . $path)) {
+                    $isValidExtraction = true;
+                    break;
+                }
+            }
+            
+            if (!$isValidExtraction) {
+                Log::error("Extracted directory does not appear to be a valid Laravel project");
+                Log::error("Files in extracted root: " . implode(', ', array_map('basename', glob($extractedRoot . '/*'))));
+                return false;
+            }
+            
             // Prepare list of directories to exclude from replacement
             $excludeDirectories = config('self-update.exclude_folders', []);
             Log::info("Excluding directories: " . implode(', ', $excludeDirectories));
             
             // Copy files from the extracted directory to the app root, skipping excluded directories
-            $this->copyDirectoryContents($extractedRoot, base_path(), $excludeDirectories);
+            $copySuccess = $this->copyDirectoryContents($extractedRoot, base_path(), $excludeDirectories);
+            
+            if (!$copySuccess) {
+                Log::error("Failed to copy extracted files to application directory");
+                return false;
+            }
             
             // Clean up
             Log::info("Cleaning up temporary files");
@@ -1391,6 +1519,7 @@ class SystemUpdateController extends Controller
             return true;
         } catch (\Exception $e) {
             Log::error("Error downloading and restoring version {$version}: " . $e->getMessage());
+            Log::error("Stack trace: " . $e->getTraceAsString());
             return false;
         }
     }
