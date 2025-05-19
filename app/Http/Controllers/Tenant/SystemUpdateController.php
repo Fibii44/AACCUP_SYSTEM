@@ -180,92 +180,136 @@ class SystemUpdateController extends Controller
                     ->with('info', "No updates available. Current version: {$currentVersion}");
             }
             
-            // Start the update process
+            // First, try downloading the release directly using our custom method
+            // This is more reliable than using the package's download mechanism
             try {
-                // We need to use reflection to create a Release object to pass to the update method
-                $release = null;
+                Log::info("Attempting direct download of version {$newVersion}");
+                $downloadResult = $this->downloadReleaseZip($newVersion);
                 
-                try {
-                    // Get the Release class
-                    $reflectionClass = new \ReflectionClass('Codedge\Updater\Models\Release');
-                    
-                    // Check if we can instantiate it
-                    if ($reflectionClass->isInstantiable()) {
-                        // Create a Release object with the constructor parameters
-                        $release = $reflectionClass->newInstance();
-                        
-                        // Set version using reflection if needed
-                        if ($reflectionClass->hasProperty('version')) {
-                            $versionProperty = $reflectionClass->getProperty('version');
-                            $versionProperty->setAccessible(true);
-                            $versionProperty->setValue($release, $newVersion);
-                        }
-                        
-                        // Now pass the Release object to the update method
-                        $updateSource = $this->updater->source();
-                        $updateResult = $updateSource->update($release);
-                    } else {
-                        Log::warning("Release class exists but is not instantiable");
-                        $updateResult = false;
-                    }
-                } catch (\Exception $e) {
-                    Log::error("Error creating Release object: " . $e->getMessage());
-                    $updateResult = false;
+                if (!$downloadResult || (is_array($downloadResult) && !$downloadResult['success'])) {
+                    Log::error("Failed to download the release ZIP for version {$newVersion}");
+                    return redirect()->route('tenant.system-updates.index')
+                        ->with('error', "Failed to download update files. Please try again.");
                 }
                 
-                // If the above doesn't work, try an alternative approach
-                if (!isset($updateResult) || $updateResult === false) {
-                    Log::warning("Trying alternative update approach");
-                    
-                    // Try to get a release object directly from package internals
+                Log::info("Successfully downloaded source code for version {$newVersion}");
+                
+                // Now extract and apply the files
+                Log::info("Starting file extraction and copy process");
+                $extractSuccess = $this->extractAndApplyRelease($newVersion);
+                if (!$extractSuccess) {
+                    Log::error("Failed to extract and apply the update files for version {$newVersion}");
+                    return redirect()->route('tenant.system-updates.index')
+                        ->with('error', "Failed to extract update files. Please try again.");
+                }
+                
+                Log::info("Successfully extracted and applied file updates for version {$newVersion}");
+                $updateResult = true;
+            } catch (\Exception $e) {
+                Log::error("Error with direct update method: " . $e->getMessage());
+                
+                // Fall back to the package's update method
+                Log::info("Falling back to package update method");
+                try {
+                    // Start the update process using the package
                     try {
-                        $updateSource = $this->updater->source();
-                        $releaseCollection = $updateSource->getReleases();
+                        // We need to use reflection to create a Release object to pass to the update method
+                        $release = null;
                         
-                        if ($releaseCollection instanceof \Illuminate\Support\Collection && $releaseCollection->isNotEmpty()) {
-                            // Get the first release from the collection
-                            $firstRelease = $releaseCollection->first();
+                        try {
+                            // Get the Release class
+                            $reflectionClass = new \ReflectionClass('Codedge\Updater\Models\Release');
                             
-                            // Pass it to the update method
-                            $updateResult = $updateSource->update($firstRelease);
-                        } else {
-                            Log::warning("No releases found in collection");
+                            // Check if we can instantiate it
+                            if ($reflectionClass->isInstantiable()) {
+                                // Create a Release object with the constructor parameters
+                                $release = $reflectionClass->newInstance();
+                                
+                                // Set version using reflection if needed
+                                if ($reflectionClass->hasProperty('version')) {
+                                    $versionProperty = $reflectionClass->getProperty('version');
+                                    $versionProperty->setAccessible(true);
+                                    $versionProperty->setValue($release, $newVersion);
+                                }
+                                
+                                // Now pass the Release object to the update method
+                                $updateSource = $this->updater->source();
+                                $updateResult = $updateSource->update($release);
+                            } else {
+                                Log::warning("Release class exists but is not instantiable");
+                                $updateResult = false;
+                            }
+                        } catch (\Exception $e) {
+                            Log::error("Error creating Release object: " . $e->getMessage());
+                            $updateResult = false;
+                        }
+                        
+                        // If the above doesn't work, try an alternative approach
+                        if (!isset($updateResult) || $updateResult === false) {
+                            Log::warning("Trying alternative update approach");
+                            
+                            // Try to get a release object directly from package internals
+                            try {
+                                $updateSource = $this->updater->source();
+                                $releaseCollection = $updateSource->getReleases();
+                                
+                                if ($releaseCollection instanceof \Illuminate\Support\Collection && $releaseCollection->isNotEmpty()) {
+                                    // Get the first release from the collection
+                                    $firstRelease = $releaseCollection->first();
+                                    
+                                    // Pass it to the update method
+                                    $updateResult = $updateSource->update($firstRelease);
+                                } else {
+                                    Log::warning("No releases found in collection");
+                                    $updateResult = false;
+                                }
+                            } catch (\Exception $e) {
+                                Log::error("Error with alternative update approach: " . $e->getMessage());
+                                $updateResult = false;
+                            }
+                        }
+                        
+                        // Do NOT set updateResult to true if all approaches failed
+                        if (!isset($updateResult)) {
+                            Log::error("All update approaches failed");
                             $updateResult = false;
                         }
                     } catch (\Exception $e) {
-                        Log::error("Error with alternative update approach: " . $e->getMessage());
+                        Log::error('Error during package update: ' . $e->getMessage());
                         $updateResult = false;
                     }
+                } catch (\Exception $e) {
+                    Log::error('Error during fallback update: ' . $e->getMessage());
+                    $updateResult = false;
                 }
-                
-                // Last resort - mock it for testing
-                if (!isset($updateResult) || $updateResult === false) {
-                    Log::warning("All update approaches failed, using manual process for testing");
-                    $updateResult = true;
-                }
-            } catch (\Exception $e) {
-                Log::error('Error during package update: ' . $e->getMessage());
-                $updateResult = true; // For testing
             }
             
             if ($updateResult) {
                 // Clear cache, update routes, etc.
+                Log::info("File copy completed successfully. Clearing application cache...");
                 Artisan::call('optimize:clear');
                 
+                // Now run tenant migrations AFTER the file copy is complete
                 // Skip main application migrations since we're in tenant context
                 // Artisan::call('migrate', ['--force' => true]);
                 
                 // Only run tenant migrations and ignore errors about existing tables
                 try {
+                    Log::info('------- STARTING DATABASE MIGRATIONS -------');
                     Log::info('Running tenant migrations...');
+                    
                     // Use our custom method to run only new migrations
                     $migrationResult = $this->runNewTenantMigrations();
                     
-                    if ($migrationResult) {
+                    if ($migrationResult === true) {
                         Log::info('Tenant migrations completed successfully');
+                    } else if (is_array($migrationResult)) {
+                        Log::info('Tenant migrations completed with info: ' . json_encode($migrationResult));
                     } else {
                         Log::warning('Tenant migrations had issues');
                     }
+                    
+                    Log::info('------- COMPLETED DATABASE MIGRATIONS -------');
                 } catch (\Exception $e) {
                     Log::warning('Tenant migration error (non-fatal): ' . $e->getMessage());
                     // Log the detailed exception
@@ -327,12 +371,580 @@ class SystemUpdateController extends Controller
     }
 
     /**
+     * Download a GitHub release ZIP file
+     * 
+     * @param string $version The version to download
+     * @return bool Whether the download was successful
+     */
+    private function downloadReleaseZip($version)
+    {
+        try {
+            // Get GitHub repository details from config
+            $githubConfig = config('self-update.repository_types.github');
+            $vendor = $githubConfig['repository_vendor'];
+            $repo = $githubConfig['repository_name'];
+            $token = $githubConfig['private_access_token'];
+            
+            // Try multiple download paths - handle both tenant and non-tenant contexts
+            $possiblePaths = [
+                storage_path('app/github-releases'),
+                storage_path('tenantitdept/app/github-releases'),
+                storage_path('tenantitdept/storage/app/github-releases'), // Nested storage path
+                base_path('storage/tenantitdept/storage/app/github-releases'), // Absolute path with nested storage
+                base_path('storage/tenantitdept/app/github-releases') // Alternate tenant path
+            ];
+            
+            // Check if any of the directory paths already exist
+            $downloadPath = null;
+            foreach ($possiblePaths as $path) {
+                if (file_exists($path)) {
+                    $downloadPath = $path;
+                    Log::info("Using existing download directory: {$downloadPath}");
+                    break;
+                }
+            }
+            
+            // If none exists, try to create each until one succeeds
+            if ($downloadPath === null) {
+                foreach ($possiblePaths as $path) {
+                    try {
+                        if (!file_exists($path)) {
+                            if (mkdir($path, 0755, true)) {
+                                $downloadPath = $path;
+                                Log::info("Created download directory: {$downloadPath}");
+                                break;
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning("Failed to create directory {$path}: " . $e->getMessage());
+                    }
+                }
+            }
+            
+            // If we still don't have a path, use the first one as a last resort
+            if ($downloadPath === null) {
+                $downloadPath = $possiblePaths[0];
+                Log::warning("Using fallback download path: {$downloadPath}");
+            }
+            
+            // Log all possible paths for debugging
+            Log::info("All possible download paths checked: " . implode(', ', $possiblePaths));
+            Log::info("Selected download path: {$downloadPath}");
+            
+            // Setup the release download URL
+            $downloadUrl = "https://github.com/{$vendor}/{$repo}/archive/refs/tags/{$version}.zip";
+            $zipFile = $downloadPath . '/' . $version . '.zip';
+            
+            // Use GuzzleHttp client to download the file
+            $client = new Client();
+            $headers = [
+                'User-Agent' => 'SystemUpdater'
+            ];
+            
+            if (!empty($token)) {
+                $headers['Authorization'] = "token {$token}";
+            }
+            
+            Log::info("Downloading from: {$downloadUrl}");
+            Log::info("Saving to: {$zipFile}");
+            
+            // Download the file
+            $response = $client->request('GET', $downloadUrl, [
+                'headers' => $headers,
+                'sink' => $zipFile,
+                'timeout' => config('self-update.download_timeout', 300)
+            ]);
+            
+            // Verify download success
+            if ($response->getStatusCode() !== 200) {
+                Log::error("Failed to download version {$version}, HTTP status: " . $response->getStatusCode());
+                return false;
+            }
+            
+            if (!file_exists($zipFile)) {
+                Log::error("File not found after download: {$zipFile}");
+                return false;
+            }
+            
+            $fileSize = filesize($zipFile);
+            if ($fileSize <= 0) {
+                Log::error("Downloaded file is empty: {$zipFile}");
+                return false;
+            }
+            
+            Log::info("Successfully downloaded {$version}.zip ({$fileSize} bytes)");
+            
+            // Return both the success status and the path where the file was saved
+            return [
+                'success' => true,
+                'path' => $downloadPath
+            ];
+            
+        } catch (\Exception $e) {
+            Log::error("Error downloading release zip: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Extract and apply a downloaded release
+     * 
+     * @param string $version The version to extract and apply
+     * @param bool $isRollback Whether this is a rollback operation
+     * @return bool Whether the extraction and application was successful
+     */
+    private function extractAndApplyRelease($version, $isRollback = false)
+    {
+        try {
+            // Try to find the ZIP file in possible locations
+            $possiblePaths = [
+                storage_path('app/github-releases'),
+                storage_path('tenantitdept/app/github-releases'),
+                storage_path('tenantitdept/storage/app/github-releases'), // Nested storage path
+                base_path('storage/tenantitdept/storage/app/github-releases'), // Absolute path with nested storage
+                base_path('storage/tenantitdept/app/github-releases') // Alternate tenant path
+            ];
+            
+            $zipFile = null;
+            $downloadPath = null;
+            
+            // Check each possible location for the zip file
+            foreach ($possiblePaths as $path) {
+                $testPath = $path . '/' . $version . '.zip';
+                if (file_exists($testPath)) {
+                    $zipFile = $testPath;
+                    $downloadPath = $path;
+                    Log::info("Found update zip file at: {$zipFile}");
+                    break;
+                }
+            }
+            
+            if (!$zipFile) {
+                Log::error("Update zip file not found in any of the possible locations");
+                Log::error("Checked the following paths:");
+                foreach ($possiblePaths as $path) {
+                    Log::error(" - {$path}/{$version}.zip");
+                }
+                return false;
+            }
+            
+            // Check file size to ensure it's a valid download
+            $fileSize = filesize($zipFile);
+            Log::info("ZIP file size: {$fileSize} bytes");
+            
+            if ($fileSize < 1000) { // Less than 1KB is definitely wrong
+                Log::error("ZIP file seems too small ({$fileSize} bytes), likely corrupted");
+                return false;
+            }
+            
+            // Check available disk space
+            $freeSpace = disk_free_space(dirname($zipFile));
+            Log::info("Free disk space: {$freeSpace} bytes");
+            
+            if ($freeSpace < $fileSize * 3) { // Need at least 3x the ZIP size for extraction
+                Log::error("Not enough disk space for extraction. Needed: " . ($fileSize * 3) . ", Available: {$freeSpace}");
+                return false;
+            }
+            
+            // Use the same base path for extract directory
+            $extractBasePath = dirname($downloadPath);
+            $extractPath = $extractBasePath . '/update-extract';
+            
+            // Clean up existing extraction directory
+            if (file_exists($extractPath)) {
+                Log::info("Removing existing extraction directory: {$extractPath}");
+                if (!File::deleteDirectory($extractPath)) {
+                    Log::error("Failed to delete existing extraction directory. Check permissions.");
+                    return false;
+                }
+            }
+            
+            if (!File::makeDirectory($extractPath, 0755, true)) {
+                Log::error("Failed to create extraction directory: {$extractPath} - Check permissions");
+                return false;
+            }
+            
+            Log::info("Extracting {$zipFile} to {$extractPath}");
+            
+            // EXTRACTION METHOD 1: Try ZipArchive first
+            $extractionSuccess = false;
+            
+            if (class_exists('ZipArchive')) {
+                try {
+                    Log::info("Attempting extraction with ZipArchive");
+                    $zip = new \ZipArchive();
+                    $openResult = $zip->open($zipFile);
+                    
+                    if ($openResult !== true) {
+                        Log::error("Failed to open zip file with ZipArchive. Error code: {$openResult}");
+                    } else {
+                        Log::info("ZipArchive opened successfully. Found " . $zip->numFiles . " files in archive");
+                        
+                        // Extract the zip file
+                        $extractResult = $zip->extractTo($extractPath);
+                        $zip->close();
+                        
+                        if ($extractResult) {
+                            Log::info("ZipArchive extraction successful");
+                            $extractionSuccess = true;
+                        } else {
+                            Log::error("ZipArchive extraction failed");
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::error("ZipArchive extraction error: " . $e->getMessage());
+                }
+            } else {
+                Log::warning("ZipArchive not available, will try alternative extraction methods");
+            }
+            
+            // EXTRACTION METHOD 2: If ZipArchive failed, try PharData
+            if (!$extractionSuccess && class_exists('PharData')) {
+                try {
+                    Log::info("Attempting extraction with PharData");
+                    
+                    // Temporarily rename zip to tar for PharData to work
+                    $tempTarPath = $zipFile . '.tar';
+                    if (copy($zipFile, $tempTarPath)) {
+                        $archive = new \PharData($tempTarPath);
+                        $archive->extractTo($extractPath, null, true); // Overwrite
+                        unlink($tempTarPath);
+                        
+                        Log::info("PharData extraction appears successful");
+                        $extractionSuccess = true;
+                    } else {
+                        Log::error("Failed to create temporary file for PharData extraction");
+                    }
+                } catch (\Exception $e) {
+                    Log::error("PharData extraction error: " . $e->getMessage());
+                }
+            }
+            
+            // EXTRACTION METHOD 3: Try system unzip command
+            if (!$extractionSuccess) {
+                try {
+                    Log::info("Attempting extraction with system unzip command");
+                    
+                    // Check if unzip command exists
+                    $unzipExists = false;
+                    
+                    if (function_exists('exec')) {
+                        $unzipExists = trim(exec('which unzip'));
+                    }
+                    
+                    if ($unzipExists) {
+                        $command = "unzip -o {$zipFile} -d {$extractPath} 2>&1";
+                        Log::info("Running command: {$command}");
+                        
+                        $output = [];
+                        $returnVar = 0;
+                        exec($command, $output, $returnVar);
+                        
+                        Log::info("Unzip command output: " . implode("\n", $output));
+                        
+                        if ($returnVar === 0) {
+                            Log::info("System unzip extraction successful");
+                            $extractionSuccess = true;
+                        } else {
+                            Log::error("System unzip extraction failed with code {$returnVar}");
+                        }
+                    } else {
+                        Log::warning("System unzip command not available");
+                    }
+                } catch (\Exception $e) {
+                    Log::error("System unzip extraction error: " . $e->getMessage());
+                }
+            }
+            
+            if (!$extractionSuccess) {
+                Log::error("All extraction methods failed. Cannot proceed with update.");
+                return false;
+            }
+            
+            // Verify extraction was successful by checking for files
+            $extractedFiles = File::allFiles($extractPath);
+            $extractedFileCount = count($extractedFiles);
+            
+            Log::info("Extracted file count: {$extractedFileCount}");
+            
+            if ($extractedFileCount === 0) {
+                Log::error("Extraction appeared to succeed but no files were extracted");
+                return false;
+            }
+            
+            // Determine the root directory inside the zip (typically repo-version format)
+            $directories = File::directories($extractPath);
+            if (count($directories) === 0) {
+                Log::error("No root directory found in extracted zip");
+                return false;
+            }
+            
+            $extractedRoot = $directories[0];
+            Log::info("Extracted files to: {$extractedRoot}");
+            
+            // Verify the extracted directory has expected structure
+            $isValidExtraction = false;
+            
+            // Check for key files/directories that should exist in any Laravel project
+            $validationPaths = [
+                'app',
+                'bootstrap',
+                'config',
+                'database',
+                'public',
+                'routes',
+                'composer.json'
+            ];
+            
+            foreach ($validationPaths as $path) {
+                if (file_exists($extractedRoot . '/' . $path)) {
+                    $isValidExtraction = true;
+                    break;
+                }
+            }
+            
+            if (!$isValidExtraction) {
+                Log::error("Extracted directory does not appear to be a valid Laravel project");
+                Log::error("Files in extracted root: " . implode(', ', array_map('basename', glob($extractedRoot . '/*'))));
+                return false;
+            }
+            
+            // Prepare list of directories to exclude from replacement
+            $excludeDirectories = config('self-update.exclude_folders', []);
+            Log::info("Excluding directories: " . implode(', ', $excludeDirectories));
+            
+            // Copy files from the extracted directory to the app root, skipping excluded directories
+            $copySuccess = $this->copyDirectoryContents($extractedRoot, base_path(), $excludeDirectories, $isRollback);
+            
+            if (!$copySuccess) {
+                Log::error("Failed to copy extracted files to application directory");
+                return false;
+            }
+            
+            // Clean up
+            Log::info("Cleaning up temporary files");
+            File::deleteDirectory($extractPath);
+            
+            return true;
+        } catch (\Exception $e) {
+            Log::error("Error extracting and applying release: " . $e->getMessage());
+            Log::error("Stack trace: " . $e->getTraceAsString());
+            return false;
+        }
+    }
+
+    /**
+     * Copy directory contents recursively, excluding specified directories
+     * 
+     * @param string $source Source directory
+     * @param string $destination Destination directory 
+     * @param array $excludeDirectories Directories to exclude
+     * @param bool $isRollback Whether this is a rollback operation
+     * @return bool Whether the copy operation was successful
+     */
+    private function copyDirectoryContents($source, $destination, $excludeDirectories = [], $isRollback = false)
+    {
+        try {
+            // Normalize paths to ensure consistent comparisons
+            $source = rtrim($source, '/\\') . DIRECTORY_SEPARATOR;
+            $destination = rtrim($destination, '/\\') . DIRECTORY_SEPARATOR;
+            
+            Log::info("Copying files from {$source} to {$destination}");
+            
+            // Get all items from the source directory
+            $items = File::allFiles($source);
+            $totalFiles = count($items);
+            $copiedFiles = 0;
+            $skippedFiles = 0;
+            $errorFiles = 0;
+            
+            Log::info("Found {$totalFiles} files to copy");
+            
+            // Track source files for rollback file removal
+            $sourceFiles = [];
+            
+            foreach ($items as $item) {
+                // Get relative path from the source root
+                $relativePath = str_replace($source, '', $item->getPathname());
+                $targetPath = $destination . $relativePath;
+                $sourceFiles[] = $relativePath;
+                
+                // Check if this file is in an excluded directory
+                $shouldExclude = false;
+                foreach ($excludeDirectories as $excludeDir) {
+                    if (strpos($relativePath, $excludeDir . DIRECTORY_SEPARATOR) === 0 || $relativePath === $excludeDir) {
+                        $shouldExclude = true;
+                        break;
+                    }
+                }
+                
+                // Skip if it's in an excluded directory
+                if ($shouldExclude) {
+                    // Log::info("Skipping excluded file: {$relativePath}");
+                    $skippedFiles++;
+                    continue;
+                }
+                
+                // Create target directory if it doesn't exist
+                $targetDir = dirname($targetPath);
+                if (!file_exists($targetDir)) {
+                    if (!File::makeDirectory($targetDir, 0755, true)) {
+                        Log::error("Failed to create directory: {$targetDir}");
+                        $errorFiles++;
+                        continue;
+                    }
+                }
+                
+                // Copy the file
+                try {
+                    if (File::copy($item->getPathname(), $targetPath)) {
+                        $copiedFiles++;
+                    } else {
+                        Log::warning("Failed to copy {$relativePath}");
+                        $errorFiles++;
+                    }
+                } catch (\Exception $e) {
+                    Log::warning("Failed to copy {$relativePath}: " . $e->getMessage());
+                    $errorFiles++;
+                }
+            }
+            
+            Log::info("Copy operation summary: {$copiedFiles} copied, {$skippedFiles} skipped, {$errorFiles} errors");
+            
+            // If this is a rollback, remove files that don't exist in the source version
+            if ($isRollback) {
+                Log::info("Rollback: Checking for files to remove");
+                $this->removeNewFilesForRollback($destination, $source, $sourceFiles, $excludeDirectories);
+            }
+            
+            return $errorFiles === 0; // Success only if there were no errors
+        } catch (\Exception $e) {
+            Log::error("Error in copyDirectoryContents: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Remove files that exist in the destination but not in the source during a rollback
+     * 
+     * @param string $destination The destination directory (app root)
+     * @param string $source The source directory (extracted rollback version)
+     * @param array $sourceFiles List of relative file paths in the source
+     * @param array $excludeDirectories Directories to exclude
+     * @return void
+     */
+    private function removeNewFilesForRollback($destination, $source, $sourceFiles, $excludeDirectories)
+    {
+        try {
+            // Get all files in the destination
+            $destFiles = File::allFiles($destination);
+            $filesRemoved = 0;
+            $dirsRemoved = 0;
+            
+            // Create a lookup array for faster checks
+            $sourceFilesLookup = array_flip($sourceFiles);
+            
+            // Process each destination file
+            foreach ($destFiles as $destFile) {
+                $relativePath = str_replace($destination, '', $destFile->getPathname());
+                
+                // Skip excluded directories
+                $shouldExclude = false;
+                foreach ($excludeDirectories as $excludeDir) {
+                    if (strpos($relativePath, $excludeDir . DIRECTORY_SEPARATOR) === 0 || $relativePath === $excludeDir) {
+                        $shouldExclude = true;
+                        break;
+                    }
+                }
+                
+                if ($shouldExclude) {
+                    continue;
+                }
+                
+                // Check if this file exists in the source
+                if (!isset($sourceFilesLookup[$relativePath]) && !file_exists($source . $relativePath)) {
+                    // This file doesn't exist in the rollback version, so delete it
+                    try {
+                        if (File::delete($destFile->getPathname())) {
+                            Log::info("Removed file: {$relativePath}");
+                            $filesRemoved++;
+                        } else {
+                            Log::warning("Failed to remove file: {$relativePath}");
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning("Error removing file {$relativePath}: " . $e->getMessage());
+                    }
+                }
+            }
+            
+            // Now remove empty directories that might have been created in the update
+            $this->removeEmptyDirectories($destination, $excludeDirectories);
+            
+            Log::info("Rollback cleanup: Removed {$filesRemoved} files that didn't exist in the previous version");
+        } catch (\Exception $e) {
+            Log::error("Error removing new files during rollback: " . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Recursively remove empty directories
+     * 
+     * @param string $directory The directory to check
+     * @param array $excludeDirectories Directories to exclude
+     * @return int Number of directories removed
+     */
+    private function removeEmptyDirectories($directory, $excludeDirectories)
+    {
+        $dirsRemoved = 0;
+        
+        // Get all subdirectories
+        $dirs = glob($directory . '/*', GLOB_ONLYDIR);
+        
+        foreach ($dirs as $dir) {
+            $relativeDir = str_replace(base_path() . DIRECTORY_SEPARATOR, '', $dir);
+            
+            // Skip excluded directories
+            $shouldExclude = false;
+            foreach ($excludeDirectories as $excludeDir) {
+                if (strpos($relativeDir, $excludeDir) === 0 || $relativeDir === $excludeDir) {
+                    $shouldExclude = true;
+                    break;
+                }
+            }
+            
+            if ($shouldExclude) {
+                continue;
+            }
+            
+            // Recursively process subdirectories
+            $subDirsRemoved = $this->removeEmptyDirectories($dir, $excludeDirectories);
+            $dirsRemoved += $subDirsRemoved;
+            
+            // Check if this directory is now empty
+            $files = glob($dir . '/*');
+            if (empty($files)) {
+                try {
+                    if (rmdir($dir)) {
+                        Log::info("Removed empty directory: {$relativeDir}");
+                        $dirsRemoved++;
+                    }
+                } catch (\Exception $e) {
+                    Log::warning("Failed to remove empty directory {$relativeDir}: " . $e->getMessage());
+                }
+            }
+        }
+        
+        return $dirsRemoved;
+    }
+
+    /**
      * Rollback to the previous version
      */
     public function rollback()
     {
         try {
             $currentVersion = config('self-update.version_installed');
+            Log::info("Starting rollback from version {$currentVersion}");
             
             // Get available GitHub releases to determine the correct rollback version
             $previousVersion = $this->getPreviousRelease($currentVersion);
@@ -344,19 +956,89 @@ class SystemUpdateController extends Controller
             }
             
             Log::info("Rolling back from {$currentVersion} to {$previousVersion}");
-            $rollbackResult = true;
             
-            // Rollback tenant database migrations
+            // First, roll back database migrations BEFORE changing files
+            // This ensures DB stays in sync with code
             try {
+                Log::info("------- STARTING DATABASE ROLLBACK -------");
                 Log::info("Rolling back tenant database migrations...");
+                
+                // Get the current batch number
+                $batch = \DB::table('migrations')->max('batch');
+                Log::info("Current migration batch: {$batch}");
+                
+                // Get migrations in the current batch
+                $migrationsToRollback = \DB::table('migrations')
+                    ->where('batch', $batch)
+                    ->pluck('migration')
+                    ->toArray();
+                
+                Log::info("Migrations to roll back: " . implode(", ", $migrationsToRollback));
+                
                 Artisan::call('tenants:rollback', [
                     '--step' => 1,  // Roll back one migration batch
                     '--force' => true
                 ]);
-                Log::info("Migration rollback output: " . Artisan::output());
+                
+                $rollbackOutput = Artisan::output();
+                Log::info("Migration rollback output: {$rollbackOutput}");
+                Log::info("------- COMPLETED DATABASE ROLLBACK -------");
             } catch (\Exception $e) {
                 Log::warning("Tenant migration rollback error (non-fatal): " . $e->getMessage());
                 // Continue despite migration errors
+            }
+            
+            // Download and extract the previous version's source code
+            try {
+                Log::info("------- STARTING FILE RESTORATION -------");
+                Log::info("Downloading and extracting source for version {$previousVersion}");
+                
+                // First try using the enhanced extraction method from the update process
+                $sourceRestored = $this->extractAndApplyRelease($previousVersion, true);
+                
+                // If that fails, try the dedicated rollback method
+                if (!$sourceRestored) {
+                    Log::warning("Failed to use standard extraction process, trying rollback-specific method");
+                    $sourceRestored = $this->downloadAndRestoreVersion($previousVersion);
+                }
+                
+                if (!$sourceRestored) {
+                    Log::error("Failed to restore source code for version {$previousVersion}");
+                    
+                    // Check if the zip file exists in any of our possible locations
+                    $possiblePaths = [
+                        storage_path('app/github-releases'),
+                        storage_path('tenantitdept/app/github-releases'),
+                        storage_path('tenantitdept/storage/app/github-releases'),
+                        base_path('storage/tenantitdept/storage/app/github-releases'),
+                        base_path('storage/tenantitdept/app/github-releases')
+                    ];
+                    
+                    $zipExists = false;
+                    foreach ($possiblePaths as $path) {
+                        $testPath = $path . '/' . $previousVersion . '.zip';
+                        if (file_exists($testPath)) {
+                            $zipExists = true;
+                            Log::info("ZIP file exists at {$testPath} but extraction failed");
+                            break;
+                        }
+                    }
+                    
+                    if (!$zipExists) {
+                        Log::error("ZIP file for version {$previousVersion} doesn't exist in any location");
+                    }
+                    
+                    return redirect()->route('tenant.system-updates.index')
+                        ->with('error', 'Failed to restore source code for version ' . $previousVersion);
+                }
+                
+                Log::info("Successfully restored source code for version {$previousVersion}");
+                Log::info("------- COMPLETED FILE RESTORATION -------");
+            } catch (\Exception $e) {
+                Log::error("Error restoring source code: " . $e->getMessage());
+                Log::error("Stack trace: " . $e->getTraceAsString());
+                return redirect()->route('tenant.system-updates.index')
+                    ->with('error', 'Error restoring source code: ' . $e->getMessage());
             }
             
             try {
@@ -389,9 +1071,10 @@ class SystemUpdateController extends Controller
             ]);
             
             return redirect()->route('tenant.system-updates.index')
-                ->with('success', 'Successfully rolled back to version ' . $previousVersion . ' and reverted database changes');
+                ->with('success', 'Successfully rolled back to version ' . $previousVersion . ' and restored files and database');
         } catch (\Exception $e) {
             Log::error('Error during rollback: ' . $e->getMessage());
+            Log::error("Stack trace: " . $e->getTraceAsString());
             
             // Record the error
             $currentVersion = config('self-update.version_installed');
@@ -678,21 +1361,30 @@ class SystemUpdateController extends Controller
                 }
             }
             
+            if (empty($newMigrations)) {
+                Log::info("No new migrations found to run");
+                return ['status' => 'no_migrations'];
+            }
+            
             // Run each new migration individually
+            $migrationsRun = [];
             foreach ($newMigrations as $migration) {
-                Log::info("Running migration: " . basename($migration));
+                $migrationName = basename($migration);
+                Log::info("Running migration: " . $migrationName);
                 \Artisan::call('migrate', [
-                    '--path' => 'database/migrations/tenant/' . basename($migration),
+                    '--path' => 'database/migrations/tenant/' . $migrationName,
                     '--force' => true,
                 ]);
                 
                 $output = \Artisan::output();
                 if ($output) {
-                    Log::info("Migration output: " . $output);
+                    Log::info("Migration output for {$migrationName}: " . $output);
                 }
+                
+                $migrationsRun[] = $migrationName;
             }
             
-            return true;
+            return ['status' => 'success', 'migrations_run' => $migrationsRun];
         } catch (\Exception $e) {
             Log::error("Error running migrations: " . $e->getMessage());
             return false;
@@ -700,75 +1392,297 @@ class SystemUpdateController extends Controller
     }
 
     /**
-     * Extract migrations from the downloaded release and run them
+     * Download and restore a specific version's source code
      * 
-     * @param string $version The version being updated to
-     * @return bool Whether the process was successful
+     * @param string $version The version to restore
+     * @return bool Whether the restoration was successful
      */
-    private function extractAndApplyMigrations($version)
+    private function downloadAndRestoreVersion($version)
     {
-        $downloadPath = config('self-update.repository_types.github.download_path', 'storage/app/github-releases');
-        $zipFile = "{$downloadPath}/{$version}.zip";
-        
-        if (!File::exists($zipFile)) {
-            Log::error("Update zip file not found: {$zipFile}");
-            return false;
-        }
-        
-        Log::info("Found update file: {$zipFile} (" . File::size($zipFile) . " bytes)");
-        
-        // Extract to a temporary directory
-        $extractPath = storage_path('app/update-extract');
-        if (File::exists($extractPath)) {
-            File::deleteDirectory($extractPath);
-        }
-        File::makeDirectory($extractPath, 0755, true);
-        
-        Log::info("Extracting to: {$extractPath}");
-        
         try {
-            $zip = new \ZipArchive;
-            if ($zip->open($zipFile) === TRUE) {
-                // Get the folder name inside the zip (GitHub adds a folder with repo-version name)
-                $folderName = $zip->getNameIndex(0);
-                Log::info("Zip contains folder: {$folderName}");
+            // Get GitHub repository details from config
+            $githubConfig = config('self-update.repository_types.github');
+            $vendor = $githubConfig['repository_vendor'];
+            $repo = $githubConfig['repository_name'];
+            $token = $githubConfig['private_access_token'];
+            
+            // Try multiple download paths - handle both tenant and non-tenant contexts
+            $possiblePaths = [
+                storage_path('app/github-releases'),
+                storage_path('tenantitdept/app/github-releases'),
+                storage_path('tenantitdept/storage/app/github-releases'), // Nested storage path
+                base_path('storage/tenantitdept/storage/app/github-releases'), // Absolute path with nested storage
+                base_path('storage/tenantitdept/app/github-releases') // Alternate tenant path
+            ];
+            
+            // Check if any of the directory paths already exist
+            $downloadPath = null;
+            foreach ($possiblePaths as $path) {
+                if (file_exists($path)) {
+                    $downloadPath = $path;
+                    Log::info("Using existing download directory: {$downloadPath}");
+                    break;
+                }
+            }
+            
+            // If none exists, try to create each until one succeeds
+            if ($downloadPath === null) {
+                foreach ($possiblePaths as $path) {
+                    try {
+                        if (!file_exists($path)) {
+                            if (mkdir($path, 0755, true)) {
+                                $downloadPath = $path;
+                                Log::info("Created download directory: {$downloadPath}");
+                                break;
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning("Failed to create directory {$path}: " . $e->getMessage());
+                    }
+                }
+            }
+            
+            // If we still don't have a path, use the first one as a last resort
+            if ($downloadPath === null) {
+                $downloadPath = $possiblePaths[0];
+                Log::warning("Using fallback download path: {$downloadPath}");
+            }
+            
+            // Log all possible paths for debugging
+            Log::info("All possible download paths checked: " . implode(', ', $possiblePaths));
+            Log::info("Selected download path: {$downloadPath}");
+            
+            // Setup the release download URL
+            $downloadUrl = "https://github.com/{$vendor}/{$repo}/archive/refs/tags/{$version}.zip";
+            $zipFile = $downloadPath . '/' . $version . '.zip';
+            
+            // Check if we already have the file downloaded
+            if (!file_exists($zipFile)) {
+                Log::info("Downloading source code for version {$version} from {$downloadUrl}");
                 
-                $zip->extractTo($extractPath);
-                $zip->close();
-                Log::info("Extraction complete");
+                // Setup HTTP client with appropriate headers
+                $client = new Client();
+                $headers = [
+                    'User-Agent' => 'SystemRollback'
+                ];
                 
-                // Find all migration files in the extracted archive
-                $migrationSourcePath = $extractPath . '/' . $folderName . 'database/migrations/tenant';
+                if (!empty($token)) {
+                    $headers['Authorization'] = "token {$token}";
+                }
                 
-                if (!File::exists($migrationSourcePath)) {
-                    Log::error("Migration directory not found in extracted update: {$migrationSourcePath}");
+                // Download the file
+                $response = $client->request('GET', $downloadUrl, [
+                    'headers' => $headers,
+                    'sink' => $zipFile,
+                    'timeout' => config('self-update.download_timeout', 300)
+                ]);
+                
+                if ($response->getStatusCode() !== 200) {
+                    Log::error("Failed to download version {$version}, HTTP status: " . $response->getStatusCode());
                     return false;
                 }
                 
-                // Find all migration files in the extracted archive
-                $migrations = File::files($migrationSourcePath);
-                Log::info("Found " . count($migrations) . " tenant migrations in the update");
-                
-                // Copy the migrations to the application's migration directory
-                $targetPath = database_path('migrations/tenant');
-                foreach ($migrations as $migration) {
-                    $filename = $migration->getFilename();
-                    Log::info("Processing migration: {$filename}");
-                    File::copy($migration->getPathname(), $targetPath . '/' . $filename);
+                if (!file_exists($zipFile)) {
+                    Log::error("File not found after download: {$zipFile}");
+                    return false;
                 }
-                
-                // Run the migrations
-                Log::info("Running tenant migrations...");
-                Artisan::call('tenants:migrate', ['--force' => true]);
-                Log::info(Artisan::output());
-                
-                return true;
             } else {
-                Log::error("Failed to open the zip file");
+                Log::info("Using previously downloaded file for version {$version}");
+            }
+            
+            // Check file size to ensure it's a valid download
+            $fileSize = filesize($zipFile);
+            Log::info("ZIP file size: {$fileSize} bytes");
+            
+            if ($fileSize < 1000) { // Less than 1KB is definitely wrong
+                Log::error("ZIP file seems too small ({$fileSize} bytes), likely corrupted");
                 return false;
             }
+            
+            // Extract the downloaded zip file
+            // Use the same base path for extract directory
+            $extractBasePath = dirname($downloadPath);
+            $extractPath = $extractBasePath . '/rollback-extract';
+            
+            // Clean up existing extraction directory
+            if (file_exists($extractPath)) {
+                Log::info("Removing existing extraction directory: {$extractPath}");
+                if (!File::deleteDirectory($extractPath)) {
+                    Log::error("Failed to delete existing extraction directory. Check permissions.");
+                    return false;
+                }
+            }
+            
+            if (!File::makeDirectory($extractPath, 0755, true)) {
+                Log::error("Failed to create extraction directory: {$extractPath}");
+                return false;
+            }
+            
+            Log::info("Extracting {$zipFile} to {$extractPath}");
+            
+            // EXTRACTION METHOD 1: Try ZipArchive first
+            $extractionSuccess = false;
+            
+            if (class_exists('ZipArchive')) {
+                try {
+                    Log::info("Attempting extraction with ZipArchive");
+                    $zip = new \ZipArchive();
+                    $openResult = $zip->open($zipFile);
+                    
+                    if ($openResult !== true) {
+                        Log::error("Failed to open zip file with ZipArchive. Error code: {$openResult}");
+                    } else {
+                        Log::info("ZipArchive opened successfully. Found " . $zip->numFiles . " files in archive");
+                        
+                        // Extract the zip file
+                        $extractResult = $zip->extractTo($extractPath);
+                        $zip->close();
+                        
+                        if ($extractResult) {
+                            Log::info("ZipArchive extraction successful");
+                            $extractionSuccess = true;
+                        } else {
+                            Log::error("ZipArchive extraction failed");
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::error("ZipArchive extraction error: " . $e->getMessage());
+                }
+            } else {
+                Log::warning("ZipArchive not available, will try alternative extraction methods");
+            }
+            
+            // EXTRACTION METHOD 2: If ZipArchive failed, try PharData
+            if (!$extractionSuccess && class_exists('PharData')) {
+                try {
+                    Log::info("Attempting extraction with PharData");
+                    
+                    // Temporarily rename zip to tar for PharData to work
+                    $tempTarPath = $zipFile . '.tar';
+                    if (copy($zipFile, $tempTarPath)) {
+                        $archive = new \PharData($tempTarPath);
+                        $archive->extractTo($extractPath, null, true); // Overwrite
+                        unlink($tempTarPath);
+                        
+                        Log::info("PharData extraction appears successful");
+                        $extractionSuccess = true;
+                    } else {
+                        Log::error("Failed to create temporary file for PharData extraction");
+                    }
+                } catch (\Exception $e) {
+                    Log::error("PharData extraction error: " . $e->getMessage());
+                }
+            }
+            
+            // EXTRACTION METHOD 3: Try system unzip command
+            if (!$extractionSuccess) {
+                try {
+                    Log::info("Attempting extraction with system unzip command");
+                    
+                    // Check if unzip command exists
+                    $unzipExists = false;
+                    
+                    if (function_exists('exec')) {
+                        $unzipExists = trim(exec('which unzip'));
+                    }
+                    
+                    if ($unzipExists) {
+                        $command = "unzip -o {$zipFile} -d {$extractPath} 2>&1";
+                        Log::info("Running command: {$command}");
+                        
+                        $output = [];
+                        $returnVar = 0;
+                        exec($command, $output, $returnVar);
+                        
+                        Log::info("Unzip command output: " . implode("\n", $output));
+                        
+                        if ($returnVar === 0) {
+                            Log::info("System unzip extraction successful");
+                            $extractionSuccess = true;
+                        } else {
+                            Log::error("System unzip extraction failed with code {$returnVar}");
+                        }
+                    } else {
+                        Log::warning("System unzip command not available");
+                    }
+                } catch (\Exception $e) {
+                    Log::error("System unzip extraction error: " . $e->getMessage());
+                }
+            }
+            
+            if (!$extractionSuccess) {
+                Log::error("All extraction methods failed. Cannot proceed with rollback.");
+                return false;
+            }
+            
+            // Verify extraction was successful by checking for files
+            $extractedFiles = File::allFiles($extractPath);
+            $extractedFileCount = count($extractedFiles);
+            
+            Log::info("Extracted file count: {$extractedFileCount}");
+            
+            if ($extractedFileCount === 0) {
+                Log::error("Extraction appeared to succeed but no files were extracted");
+                return false;
+            }
+            
+            // Determine the root directory inside the zip (typically repo-version format)
+            $directories = File::directories($extractPath);
+            if (count($directories) === 0) {
+                Log::error("No root directory found in extracted zip");
+                return false;
+            }
+            
+            $extractedRoot = $directories[0];
+            Log::info("Extracted files to: {$extractedRoot}");
+            
+            // Verify the extracted directory has expected structure
+            $isValidExtraction = false;
+            
+            // Check for key files/directories that should exist in any Laravel project
+            $validationPaths = [
+                'app',
+                'bootstrap',
+                'config',
+                'database',
+                'public',
+                'routes',
+                'composer.json'
+            ];
+            
+            foreach ($validationPaths as $path) {
+                if (file_exists($extractedRoot . '/' . $path)) {
+                    $isValidExtraction = true;
+                    break;
+                }
+            }
+            
+            if (!$isValidExtraction) {
+                Log::error("Extracted directory does not appear to be a valid Laravel project");
+                Log::error("Files in extracted root: " . implode(', ', array_map('basename', glob($extractedRoot . '/*'))));
+                return false;
+            }
+            
+            // Prepare list of directories to exclude from replacement
+            $excludeDirectories = config('self-update.exclude_folders', []);
+            Log::info("Excluding directories: " . implode(', ', $excludeDirectories));
+            
+            // Copy files from the extracted directory to the app root, skipping excluded directories
+            $copySuccess = $this->copyDirectoryContents($extractedRoot, base_path(), $excludeDirectories, true);
+            
+            if (!$copySuccess) {
+                Log::error("Failed to copy extracted files to application directory");
+                return false;
+            }
+            
+            // Clean up
+            Log::info("Cleaning up temporary files");
+            File::deleteDirectory($extractPath);
+            
+            return true;
         } catch (\Exception $e) {
-            Log::error("Error extracting and applying migrations: " . $e->getMessage());
+            Log::error("Error downloading and restoring version {$version}: " . $e->getMessage());
+            Log::error("Stack trace: " . $e->getTraceAsString());
             return false;
         }
     }
