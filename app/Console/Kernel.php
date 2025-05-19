@@ -5,6 +5,9 @@ namespace App\Console;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 use App\Console\Commands\TenantSafeMigrateCommand;
+use App\Console\Commands\TestUpdate;
+use App\Console\Commands\ForceUpdate;
+use App\Console\Commands\ManualUpdateTest;
 
 class Kernel extends ConsoleKernel
 {
@@ -15,6 +18,9 @@ class Kernel extends ConsoleKernel
      */
     protected $commands = [
         TenantSafeMigrateCommand::class,
+        TestUpdate::class,
+        ForceUpdate::class,
+        ManualUpdateTest::class,
     ];
 
     /**

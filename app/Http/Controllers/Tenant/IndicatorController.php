@@ -85,7 +85,21 @@ class IndicatorController extends Controller
     public function store(Request $request, Parameter $parameter)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                function ($attribute, $value, $fail) use ($parameter) {
+                    // Check if an indicator with the same name already exists for this parameter
+                    $exists = Indicator::where('parameter_id', $parameter->id)
+                        ->where('name', $value)
+                        ->exists();
+                    
+                    if ($exists) {
+                        $fail('Name already exists');
+                    }
+                }
+            ],
             'description' => 'nullable|string',
             'order' => 'nullable|integer',
         ]);
@@ -112,30 +126,69 @@ class IndicatorController extends Controller
      */
     public function update(Request $request, Indicator $indicator)
     {
-        $validated = $request->validate([
-            'name' => 'sometimes|required|string|max:255',
-            'description' => 'nullable|string',
-            'order' => 'nullable|integer',
-        ]);
+        try {
+            $validated = $request->validate([
+                'name' => [
+                    'sometimes',
+                    'required',
+                    'string',
+                    'max:255',
+                    function ($attribute, $value, $fail) use ($indicator) {
+                        // Check if another indicator with the same name already exists for this parameter
+                        $exists = Indicator::where('parameter_id', $indicator->parameter_id)
+                            ->where('name', $value)
+                            ->where('id', '!=', $indicator->id)
+                            ->exists();
+                        
+                        if ($exists) {
+                            $fail('Name already exists');
+                        }
+                    }
+                ],
+                'description' => 'nullable|string',
+                'order' => 'nullable|integer',
+            ]);
 
-        // Check if name is changed to update Google Drive folder
-        if (isset($validated['name']) && $validated['name'] !== $indicator->name) {
-            $oldName = $indicator->name;
-            $newName = $validated['name'];
-            
-            // Rename Google Drive folder if it exists
-            if ($this->drive && $indicator->google_drive_folder_id) {
-                try {
-                    $this->renameGoogleDriveFolder($indicator, $newName);
-                } catch (\Exception $e) {
-                    Log::warning('Failed to rename Google Drive folder for indicator: ' . $e->getMessage());
+            // Check if name is changed to update Google Drive folder
+            if (isset($validated['name']) && $validated['name'] !== $indicator->name) {
+                $oldName = $indicator->name;
+                $newName = $validated['name'];
+                
+                // Rename Google Drive folder if it exists
+                if ($this->drive && $indicator->google_drive_folder_id) {
+                    try {
+                        $this->renameGoogleDriveFolder($indicator, $newName);
+                    } catch (\Exception $e) {
+                        Log::warning('Failed to rename Google Drive folder for indicator: ' . $e->getMessage());
+                    }
                 }
             }
-        }
 
-        $indicator->update($validated);
-        
-        return response()->json($indicator);
+            $indicator->update($validated);
+            
+            return response()->json([
+                'success' => true,
+                'data' => $indicator
+            ]);
+            
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false, 
+                'message' => 'Name already exists',
+                'errors' => $e->errors()
+            ], 422);
+            
+        } catch (\Exception $e) {
+            Log::error('Error updating indicator', [
+                'id' => $indicator->id,
+                'error' => $e->getMessage()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update indicator: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -143,14 +196,19 @@ class IndicatorController extends Controller
      */
     public function destroy(Indicator $indicator)
     {
-        // Delete Google Drive folder if it exists
-        if ($this->drive && $indicator->google_drive_folder_id) {
+        // Check if indicator has uploads before deleting Google Drive folder
+        $hasUploads = $indicator->uploads()->exists();
+
+        // Delete Google Drive folder if it exists AND no uploads exist
+        if ($this->drive && $indicator->google_drive_folder_id && !$hasUploads) {
             try {
                 $this->drive->files->delete($indicator->google_drive_folder_id);
                 Log::info('Deleted Google Drive folder for indicator: ' . $indicator->name);
             } catch (\Exception $e) {
                 Log::warning('Failed to delete Google Drive folder for indicator: ' . $e->getMessage());
             }
+        } else if ($hasUploads && $indicator->google_drive_folder_id) {
+            Log::info('Preserved Google Drive folder for indicator because it has uploads: ' . $indicator->name);
         }
 
         $indicator->delete();

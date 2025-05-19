@@ -103,9 +103,13 @@ class InstrumentController extends Controller
      */
     public function store(Request $request)
     {
+        $messages = [
+            'name.unique' => 'Name already exists'
+        ];
+
         $validator = Validator::make($request->all(), [
-            'name' => 'required|max:255',
-        ]);
+            'name' => 'required|max:255|unique:instruments,name',
+        ], $messages);
 
         if ($validator->fails()) {
             if ($request->ajax() || $request->wantsJson()) {
@@ -307,12 +311,19 @@ class InstrumentController extends Controller
      */
     public function update(Request $request, Instrument $instrument)
     {
+        $messages = [
+            'name.unique' => 'Name already exists'
+        ];
+
         $validator = Validator::make($request->all(), [
-            'name' => 'required|max:255',
-        ]);
+            'name' => 'required|max:255|unique:instruments,name,' . $instrument->id,
+        ], $messages);
 
         if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
         }
 
         try {
@@ -405,11 +416,27 @@ class InstrumentController extends Controller
         }
     }
 
+    /**
+     * Remove the specified instrument.
+     */
     public function destroy(Instrument $instrument)
     {
         try {
-            // Delete Google Drive folder if it exists
-            if ($instrument->google_drive_folder_id) {
+            // Check if any indicators within any parameters of any areas of this instrument have uploads
+            $hasUploads = false;
+            foreach ($instrument->areas as $area) {
+                foreach ($area->parameters as $parameter) {
+                    foreach ($parameter->indicators as $indicator) {
+                        if ($indicator->uploads()->exists()) {
+                            $hasUploads = true;
+                            break 3; // Break out of all loops
+                        }
+                    }
+                }
+            }
+
+            // Delete Google Drive folder if it exists AND no uploads exist
+            if ($instrument->google_drive_folder_id && !$hasUploads) {
                 try {
                     // Get the folder ID (handle both string and array formats)
                     $folderId = is_array($instrument->google_drive_folder_id) ? 
@@ -429,6 +456,11 @@ class InstrumentController extends Controller
                     ]);
                     // Continue with instrument deletion even if folder deletion fails
                 }
+            } else if ($hasUploads && $instrument->google_drive_folder_id) {
+                \Log::info('Preserved Google Drive folder for instrument because it contains indicators with uploads', [
+                    'instrument_id' => $instrument->id,
+                    'folder_id' => $instrument->google_drive_folder_id
+                ]);
             }
 
             $instrument->delete();
@@ -437,7 +469,8 @@ class InstrumentController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Instrument deleted successfully',
-                'folder_deleted' => $instrument->google_drive_folder_id ? true : null
+                'folder_deleted' => $instrument->google_drive_folder_id && !$hasUploads ? true : false,
+                'folder_preserved' => $hasUploads && $instrument->google_drive_folder_id ? true : false
             ]);
         } catch (\Exception $e) {
             \Log::error('Error deleting instrument', [

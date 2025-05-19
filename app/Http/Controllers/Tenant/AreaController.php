@@ -83,7 +83,21 @@ class AreaController extends Controller
     public function store(Request $request, Instrument $instrument)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                function ($attribute, $value, $fail) use ($instrument) {
+                    // Check if an area with the same name already exists for this instrument
+                    $exists = Area::where('instrument_id', $instrument->id)
+                        ->where('name', $value)
+                        ->exists();
+                    
+                    if ($exists) {
+                        $fail('Name already exists');
+                    }
+                }
+            ],
             'description' => 'nullable|string',
             'order' => 'nullable|integer',
         ]);
@@ -148,13 +162,29 @@ class AreaController extends Controller
      */
     public function update(Request $request, Area $area)
     {
-        $validated = $request->validate([
-            'name' => 'sometimes|required|string|max:255',
-            'description' => 'nullable|string',
-            'order' => 'nullable|integer',
-        ]);
-
         try {
+            $validated = $request->validate([
+                'name' => [
+                    'sometimes',
+                    'required',
+                    'string',
+                    'max:255',
+                    function ($attribute, $value, $fail) use ($area) {
+                        // Check if another area with the same name already exists for this instrument
+                        $exists = Area::where('instrument_id', $area->instrument_id)
+                            ->where('name', $value)
+                            ->where('id', '!=', $area->id)
+                            ->exists();
+                        
+                        if ($exists) {
+                            $fail('Name already exists');
+                        }
+                    }
+                ],
+                'description' => 'nullable|string',
+                'order' => 'nullable|integer',
+            ]);
+
             DB::beginTransaction();
 
             // Store the old name for comparison
@@ -181,12 +211,30 @@ class AreaController extends Controller
             
             // Check if the request is AJAX
             if ($request->ajax() || $request->wantsJson() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
-                return response()->json($area);
+                return response()->json([
+                    'success' => true,
+                    'data' => $area
+                ]);
             }
             
             // For regular form submissions, redirect back to the instrument show page
             return redirect()->route('tenant.instruments.show', $area->instrument_id)
                 ->with('success', 'Area updated successfully');
+                
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            DB::rollBack();
+            
+            if ($request->ajax() || $request->wantsJson() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
+                return response()->json([
+                    'success' => false, 
+                    'message' => 'Name already exists',
+                    'errors' => $e->errors()
+                ], 422);
+            }
+            
+            return redirect()->back()
+                ->withErrors($e->errors())
+                ->withInput();
                 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -216,8 +264,19 @@ class AreaController extends Controller
         $instrumentId = $area->instrument_id;
         
         try {
-            // Delete Google Drive folder if it exists
-            if ($area->google_drive_folder_id) {
+            // Check if any indicators within any parameters of this area have uploads
+            $hasUploads = false;
+            foreach ($area->parameters as $parameter) {
+                foreach ($parameter->indicators as $indicator) {
+                    if ($indicator->uploads()->exists()) {
+                        $hasUploads = true;
+                        break 2; // Break out of both loops
+                    }
+                }
+            }
+
+            // Delete Google Drive folder if it exists AND no uploads exist
+            if ($area->google_drive_folder_id && !$hasUploads) {
                 try {
                     $this->driveService->files->delete($area->google_drive_folder_id);
                     Log::info('Google Drive folder deleted for area', [
@@ -232,6 +291,11 @@ class AreaController extends Controller
                     ]);
                     // Continue with area deletion even if folder deletion fails
                 }
+            } else if ($hasUploads && $area->google_drive_folder_id) {
+                Log::info('Preserved Google Drive folder for area because it contains indicators with uploads', [
+                    'area_id' => $area->id,
+                    'folder_id' => $area->google_drive_folder_id
+                ]);
             }
 
             $area->delete();
