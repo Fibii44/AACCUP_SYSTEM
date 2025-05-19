@@ -1,0 +1,27 @@
+/* Custom dark mode styling */
+:root.dark, .dark {
+    --bg-background: #000435 !important;
+}
+
+.dark body, 
+.dark .bg-background, 
+.dark .bg-default,
+.dark [data-theme="dark"] {
+    background-color: #000435 !important;
+}
+
+.dark .bg-white {
+    background-color: #000435 !important;
+}
+
+.dark .text-gray-500 {
+    color: #FFFFFF !important;
+}
+
+.dark .text-gray-900 {
+    color: #FFFFFF !important;
+}
+
+.dark .border-gray-200 {
+    border-color: rgba(255, 193, 0, 0.2) !important;
+} 
