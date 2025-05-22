@@ -2,42 +2,6 @@
 
 A multi-tenant Laravel application for AACCUP departments.
 
-## Utility Scripts
-
-The following utility scripts are provided to help manage tenants:
-
-### `direct-tenant-tables.php`
-
-Creates or fixes tables in a tenant's database.
-
-```bash
-php direct-tenant-tables.php <tenant-id>
-```
-
-### `check-tenant-domain.php`
-
-Verifies if a tenant domain is properly set up.
-
-```bash
-php check-tenant-domain.php <tenant-id>
-```
-
-### `add-tenant-host.php`
-
-Adds tenant domains to your local hosts file. Run the generated batch file as administrator.
-
-```bash
-php add-tenant-host.php
-```
-
-### `configure-herd-domains.php`
-
-Configures Laravel Herd for multi-tenancy (if you're using Herd).
-
-```bash
-php configure-herd-domains.php
-```
-
 ## Routes
 
 The application uses two main route groups:
